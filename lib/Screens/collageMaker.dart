@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_collage_widget/utils/collage_type.dart';
 
+// ignore: must_be_immutable
 class CollageMaker extends StatefulWidget {
   File? imageFile1;
   File? imageFile2;
