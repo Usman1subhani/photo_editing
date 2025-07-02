@@ -1,17 +1,15 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:path/path.dart' as path;
-import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:ui';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:fluttertoast/fluttertoast.dart';
-import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_resizer_image/flutter_resizer_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:cropmeapp/Constants/color_constants.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:saver_gallery/saver_gallery.dart';
-
-import 'ImageResize.dart';
 
 class ResizeWithPlatform extends StatefulWidget {
   final File imageFile;
@@ -24,218 +22,320 @@ class ResizeWithPlatform extends StatefulWidget {
 }
 
 class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
-  File? croppedImage;
+  final TransformationController _transformationController = TransformationController();
+  final GlobalKey _previewKey = GlobalKey();
+  int selectedOption = 0;
+  bool isSaving = false;
 
-  Map<String, List<List<double>>> platformRatios = {
+  Future<File> captureRenderedImageAndResize(int width, int height) async {
+    try {
+      RenderRepaintBoundary boundary = _previewKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      var image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(format: ImageByteFormat.png);
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
+
+      img.Image? decoded = img.decodeImage(pngBytes);
+      if (decoded == null) throw Exception('Failed to decode screenshot');
+      img.Image resized = img.copyResize(decoded, width: width, height: height);
+      Uint8List resizedBytes = Uint8List.fromList(img.encodePng(resized));
+
+      final Directory tempDir = Directory.systemTemp;
+      final String tempPath = '${tempDir.path}/final_rendered_image_${DateTime.now().millisecondsSinceEpoch}.png';
+      File resizedFile = File(tempPath)..writeAsBytesSync(resizedBytes);
+      return resizedFile;
+    } catch (e) {
+      print("Render error: $e");
+      return widget.imageFile;
+    }
+  }
+
+    // Platform-specific size options
+  final Map<String, List<Map<String, dynamic>>> platformOptions = {
     'Facebook': [
-      [180, 180],   // 1:1 (Profile picture)
-      [820, 312],   // 2.63:1 (Cover photo)
-      [1200, 630],  // 1.91:1 (Link sharing)
-      [1200, 900],  // 4:3 (Post image)
-      [1200, 628],  // 1.91:1 (Ad image)
-      [1200, 717],  // 1.67:1 (Event cover photo)
-      [1920, 1080], // 16:9 (Video post)
-      [1640, 856],  // 1.91:1 (Larger link sharing)
-      [1080, 1920], // 9:16 (Facebook Stories)
+      {'label': 'Profile', 'width': 180, 'height': 180, 'aspect': 1.0},
+      {'label': 'Post', 'width': 1200, 'height': 630, 'aspect': 1200 / 630},
+      {'label': 'Cover', 'width': 851, 'height': 312, 'aspect': 16 / 9},
+      {'label': 'Story', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+      {'label': 'Groups', 'width': 1640, 'height': 956, 'aspect': 1.91 / 1},
+      {'label': 'Events', 'width': 1200, 'height': 628, 'aspect': 16 / 9},
+      {'label': 'Portrait', 'width': 1080, 'height': 1350, 'aspect': 4 / 5},
     ],
     'Instagram': [
-      [110, 110],   // 1:1 (Profile picture)
-      [1080, 1080], // 1:1 (Post image)
-      [1080, 608],  // 1.78:1 (Landscape image)
-      [1080, 1350], // 4:5 (Portrait image)
-      [1080, 1980], // 9:16 (Instagram Stories)
+      {'label': 'Profile', 'width': 110, 'height': 110, 'aspect': 1.0},
+      {'label': 'Post', 'width': 1080, 'height': 1080, 'aspect': 1.0},
+      {'label': 'Portrait', 'width': 1080, 'height': 1350, 'aspect': 4 / 5},
+      {'label': 'Landscape', 'width': 1080, 'height': 566, 'aspect': 1.91 / 1},
+      {'label': 'Story', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+      {'label': 'Reel', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+    ],
+    'TikTok': [
+      {'label': 'Profile', 'width': 20, 'height': 20, 'aspect': 1.0},
+      {'label': 'Virtical Image AD', 'width': 540, 'height': 960, 'aspect': 0.56 / 1},
+      {'label': 'Square Image AD', 'width': 640, 'height': 640, 'aspect': 1.1},
+      {'label': 'Landscape Image AD', 'width': 960, 'height': 540, 'aspect': 16 / 9},
+      {'label': 'Video', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+    ],
+    'YouTube': [
+      {'label': 'Profile', 'width': 800, 'height': 800, 'aspect': 1.0},
+      {'label': 'Channel Cover', 'width': 2560, 'height': 1440, 'aspect': 16 / 9},
+      {'label': 'Video Thumbnail', 'width': 1280, 'height': 720, 'aspect': 16 / 9},
+      {'label': 'Video', 'width': 1080, 'height': 1920, 'aspect': 16 / 9},
     ],
     'Twitter': [
-      [400, 400],   // 1:1 (Profile picture)
-      [1500, 500],  // 3:1 (Cover photo)
-      [1200, 628],  // 1.91:1 (Link sharing)
-      [1200, 675],  // 16:9 (Post image)
-      [700, 800],   // 7:8 (Portrait image)
-      [1200, 686],  // 16:9 (Post image)
-      [1200, 600],  // 2:1 (Post image)
+      {'label': 'Profile', 'width': 400, 'height': 400, 'aspect': 1.0},
+      {'label': 'Cover', 'width': 1500, 'height': 500, 'aspect': 3 / 1},
+      {
+        'label': 'Landscape Post',
+        'width': 1600,
+        'height': 900,
+        'aspect': 16 / 9
+      },
+      {
+        'label': 'Landscape Post',
+        'width': 1800,
+        'height': 1800,
+        'aspect': 1 / 1
+      },
     ],
     'LinkedIn': [
-      [400, 400],   // 1:1 (Profile picture)
-      [1584, 396],  // 4:1 (Cover photo)
-      [300, 300],   // 1:1 (Company logo)
-      [1536, 768],  // 2:1 (Link sharing)
-      [1128, 376],  // 3:1 (Banner image)
-      [900, 600],   // 3:2 (Post image)
-      [1200, 1200], // 1:1 (Post image)
-      [1200, 627],  // 1.91:1 (Link sharing)
+      {'label': 'Profile', 'width': 400, 'height': 400, 'aspect': 1.0},
+      {'label': 'Cover', 'width': 1128, 'height': 191, 'aspect': 5.91 / 1},
+      {'label': 'Post', 'width': 1200, 'height': 627, 'aspect': 1.91 / 1},
+      {'label': 'Sponsored Carousel', 'width': 1080, 'height': 1080, 'aspect': 1 / 1},
     ],
     'WhatsApp': [
-      [192, 192],   // 1:1 (Profile picture)
-      [1080, 1920], // 9:16 (WhatsApp Status)
-      [500, 500],   // 1:1 (Post image)
+      {'label': 'Profile', 'width': 192, 'height': 192, 'aspect': 1.0},
+      {'label': 'Status', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
     ],
     'Snapchat': [
-      [1080, 1920], // 9:16 (Snapchat Stories)
-      [1080, 2340], // 9:19.5 (Snapchat Spotlight)
+      {'label': 'Story', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+      {'label': 'Profile', 'width': 320, 'height': 320, 'aspect': 1.0},
     ],
     'Pinterest': [
-      [165, 165],   // 1:1 (Profile picture)
-      [1000, 1000], // 1:1 (Pin image)
-      [1000, 1500], // 2:3 (Pin image)
-      [1000, 2100], // 1:2.1 (Pin image)
-      [1000, 3000], // 1:3 (Pin image)
-      [800, 800],   // 1:1 (Square Pin image)
+      {'label': 'Profile', 'width': 165, 'height': 165, 'aspect': 1.0},
+      {'label': 'Profile Cover', 'width': 800, 'height': 450, 'aspect': 16 / 9},
+      {'label': 'Standard Pins', 'width': 1000, 'height': 1500, 'aspect': 2 / 3},
+      {'label': 'Square Pins', 'width': 1000, 'height': 1000, 'aspect': 1 / 1},
+      {'label': 'Story Pins', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+      {'label': 'Board Cover', 'width': 222, 'height': 150, 'aspect': 37 / 25},
     ],
   };
 
-  Future<void> cropImage(double width, double height) async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            ImageManipulation(image: widget.imageFile, width: width, height: height),
-      ),
-    );
-    // CroppedFile? cropped = await ImageCropper().cropImage(
-    //   sourcePath: widget.imageFile.path,
-    //   aspectRatio: CropAspectRatio(ratioX: width, ratioY: height),
-    //   compressFormat: ImageCompressFormat.jpg,
-    //   compressQuality: 100,
-    //   uiSettings: [
-    //     AndroidUiSettings(
-    //       toolbarTitle: 'Resize Image',
-    //       toolbarColor: ColorConstants.bottomBar,
-    //       toolbarWidgetColor: ColorConstants.primaryColor,
-    //       initAspectRatio: CropAspectRatioPreset.original,
-    //       lockAspectRatio: false,
-    //     ),
-    //     IOSUiSettings(
-    //       title: 'Resize Image',
-    //     ),
-    //   ],
-    // );
-    //
-    // if (cropped != null) {
-    //   setState(() {
-    //     croppedImage = File(cropped.path);
-    //   });
-    // }
+  Future<void> _saveImageToGallery(File imageFile) async {
+    try {
+      setState(() => isSaving = true);
+
+      PermissionStatus status;
+      if (await Permission.photos.request().isGranted) {
+        status = PermissionStatus.granted;
+      } else {
+        status = await Permission.storage.request();
+      }
+
+      if (!status.isGranted) {
+        if (status.isPermanentlyDenied) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Storage permission permanently denied. Please enable it in app settings.'),
+              action: SnackBarAction(label: 'Settings', onPressed: () => openAppSettings()),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Storage permission not granted')),
+          );
+        }
+        throw Exception('Storage permission not granted');
+      }
+
+      final bytes = await imageFile.readAsBytes();
+      final result = await ImageGallerySaver.saveImage(
+        bytes,
+        quality: 100,
+        name: "resized_image_${DateTime.now().millisecondsSinceEpoch}",
+      );
+
+      if (result['isSuccess'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image saved to gallery!')),
+        );
+      } else {
+        throw Exception('Failed to save image');
+      }
+    } catch (e) {
+      print("Save error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save image: $e')),
+      );
+    } finally {
+      setState(() => isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    List<List<double>> cropRatios = platformRatios[widget.platform] ?? [];
+    final options = platformOptions[widget.platform] ?? [];
+    final double aspect = selectedOption < options.length ? options[selectedOption]['aspect'] ?? 1.0 : 1.0;
 
     return Scaffold(
-      backgroundColor: ColorConstants.backgroundColor,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        leading: GestureDetector(
-          onTap: () {
-            Navigator.pop(context, croppedImage);
-          },
-          child: const Icon(Icons.navigate_before, color: ColorConstants.primaryColor),
+        backgroundColor: Colors.black,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
-        backgroundColor: ColorConstants.bottomBar,
-        title: Text(widget.platform, style: const TextStyle(color: ColorConstants.primaryColor)),
+        title: Text(widget.platform, style: const TextStyle(color: Colors.white)),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: () async {
-              await _saveToGallery(croppedImage!.readAsBytesSync());
-              Navigator.pop(context);
-            },
-            icon: const Icon(FontAwesomeIcons.check, color: ColorConstants.primaryColor),
-          ),
+          if (isSaving)
+            const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          else
+            IconButton(
+              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              onPressed: () async {
+                if (selectedOption < options.length) {
+                  final option = options[selectedOption];
+                  File imageToSave = await captureRenderedImageAndResize(option['width'], option['height']);
+                  await _saveImageToGallery(imageToSave);
+                  if (mounted) {
+                    Navigator.pop(context, imageToSave);
+                  }
+                }
+              },
+            ),
         ],
       ),
       body: Column(
         children: [
+          const SizedBox(height: 20),
           Expanded(
-            child: Container(
-              color: ColorConstants.backgroundColor,
-              child: croppedImage == null
-                  ? Image.file(widget.imageFile)
-                  : Image.file(croppedImage!),
-            ),
-          ),
-          Container(
-            height: 100,
-            width: double.infinity,
-            color: ColorConstants.bottomBar,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                child: Row(
-                  children: cropRatios.map((ratio) {
-                    double width = ratio[0];
-                    double height = ratio[1];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      child: GestureDetector(
-                        onTap: () async {
-                          await cropImage(width, height);
-                        },
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: ColorConstants.backgroundColor,
-                            borderRadius: BorderRadius.circular(100),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${width.toInt()} x ${height.toInt()}',
-                              style: const TextStyle(
-                                color: ColorConstants.primaryColor,
-                                fontSize: 9,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: aspect,
+                child: RepaintBoundary(
+                  key: _previewKey,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      InteractiveViewer(
+                        transformationController: _transformationController,
+                        minScale: 1,
+                        maxScale: 4,
+                        child: Image.file(
+                          widget.imageFile,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      IgnorePointer(
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: aspect,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.blueAccent, width: 2.5),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    );
-                  }).toList(),
+                    ],
+                  ),
                 ),
               ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 100,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[900],
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+            ),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: options.length,
+              itemBuilder: (context, index) {
+                final option = options[index];
+                final isSelected = selectedOption == index;
+                return GestureDetector(
+                  onTap: () => setState(() => selectedOption = index),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: CustomPaint(
+                            painter: _AspectRatioPainter(
+                              aspectRatio: option['aspect'],
+                              color: isSelected ? Colors.white : Colors.grey[400]!,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          option['label'],
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.grey[400],
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Future<void> _requestPermission() async {
-    bool status;
-    if (Platform.isAndroid) {
-      final deviceInfoPlugin = DeviceInfoPlugin();
-      final deviceInfo = await deviceInfoPlugin.androidInfo;
-      final sdkInt = deviceInfo.version.sdkInt;
-      if (sdkInt >= 29) {
-        status = await Permission.manageExternalStorage.request().isGranted;
-      } else {
-        status = await Permission.storage.request().isGranted;
-      }
+class _AspectRatioPainter extends CustomPainter {
+  final double aspectRatio;
+  final Color color;
+
+  _AspectRatioPainter({required this.aspectRatio, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    double w, h;
+    if (aspectRatio > 1) {
+      w = size.width;
+      h = size.width / aspectRatio;
     } else {
-      status = await Permission.photosAddOnly.request().isGranted;
+      h = size.height;
+      w = size.height * aspectRatio;
     }
+
+    final left = (size.width - w) / 2;
+    final top = (size.height - h) / 2;
+
+    final rect = Rect.fromLTWH(left, top, w, h);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
+    canvas.drawRRect(rrect, paint);
   }
 
-  Future<void> _saveToGallery(Uint8List bytes) async {
-    try {
-      final directory = await getExternalStorageDirectory();
-      final imagePath = path.join(directory!.path, '${DateTime.now().millisecondsSinceEpoch}.jpg');
-      final file = File(imagePath);
-      await file.writeAsBytes(bytes);
-
-      final result = await SaverGallery.saveFile(
-        file: file.path,
-        name: path.basename(file.path),
-        androidExistNotSave: false,
-      );
-      _toastInfo('Image saved to gallery');
-    } catch (e) {
-      _toastInfo('Failed to save image: $e');
-    }
-  }
-
-  _toastInfo(String info) {
-    Fluttertoast.showToast(msg: info, toastLength: Toast.LENGTH_LONG);
-  }
-
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

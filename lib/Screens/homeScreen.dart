@@ -2,6 +2,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:cropmeapp/Constants/color_constants.dart';
 import 'package:cropmeapp/Constants/image_constants.dart';
+import 'package:cropmeapp/Screens/Compress.dart';
+import 'package:cropmeapp/Screens/collageMaker.dart';
 import 'package:cropmeapp/Screens/editImage.dart';
 import 'package:cropmeapp/Screens/resizeScreen.dart';
 import 'package:cropmeapp/Screens/resizeWithPlatform.dart';
@@ -24,25 +26,47 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> platforms = [
     'Facebook',
     'Instagram',
+    'TikTok',
+    'YouTube',
     'Twitter',
+    
+  ];
+  final List<String> newPlatforms = [
     'LinkedIn',
     'WhatsApp',
+    'Telegram',
     'Snapchat',
-    'Pinterest'
+    'Pinterest', // Only in newPlatforms, not in platforms
   ];
-  final List<String> newPlatforms = ['Snapchat', 'Pinterest'];
 
   final Map<String, IconData> platformIcons = {
     'Facebook': FontAwesomeIcons.facebook,
     'Instagram': FontAwesomeIcons.instagram,
+    'TikTok': FontAwesomeIcons.tiktok,
+    'YouTube': FontAwesomeIcons.youtube,
     'WhatsApp': FontAwesomeIcons.whatsapp,
     'Snapchat': FontAwesomeIcons.snapchat,
     'Twitter': FontAwesomeIcons.twitter,
     'LinkedIn': FontAwesomeIcons.linkedin,
     'Pinterest': FontAwesomeIcons.pinterest,
+    'Telegram': FontAwesomeIcons.telegram,
   };
 
-  Future<void> selectGalleryImageForSocialMedia(BuildContext context, String platform) async {
+  final Map<String, Color> platformBrandColors = {
+    'Facebook': const Color(0xFF1877F3),
+    'Instagram': const Color(0xFFE4405F),
+    'TikTok': const Color(0xFF69C9D0),
+    'YouTube': const Color(0xFFFF0000),
+    'Twitter': const Color(0xFF1DA1F2),
+    'LinkedIn': const Color(0xFF0A66C2),
+    'WhatsApp': const Color(0xFF25D366),
+    'Telegram': const Color(0xFF229ED9),
+    'Snapchat': const Color(0xFFFFFC00),
+    'Pinterest': const Color(0xFFE60023),
+  };
+
+  Future<void> selectGalleryImageForSocialMedia(
+      BuildContext context, String platform) async {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
@@ -67,8 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              ResizeScreen(imageFile: imageFile),
+          builder: (context) => ResizeScreen(imageFile: imageFile),
         ),
       );
     }
@@ -183,124 +206,42 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Text('Resize Image for',
                       style: TextStyle(
                           color: ColorConstants.primaryColor,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 20)),
-                  SizedBox(height: 15.h),
-                  SizedBox(
-                    height: 60,
-                    width: double.infinity,
-                    child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: platforms.sublist(0, 5).length,
-                        itemBuilder: (context, index) {
-                          String platform = platforms[index];
-                          IconData icon = platformIcons[platform]!;
-
-                          Color platformColor;
-                          switch (platform) {
-                            case 'Facebook':
-                              platformColor = ColorConstants.facebookColor;
-                              break;
-                            case 'Instagram':
-                              platformColor = ColorConstants.instagramColor;
-                              break;
-                            case 'Twitter':
-                              platformColor = ColorConstants.twitterColor;
-                              break;
-                            case 'WhatsApp':
-                              platformColor = ColorConstants.whatsAppColor;
-                              break;
-                            case 'LinkedIn':
-                              platformColor = ColorConstants.linkedInColor;
-                              break;
-                            case 'Pinterest':
-                              platformColor = ColorConstants.pinterestColor;
-                              break;
-                            case 'Snapchat':
-                              platformColor = ColorConstants.snapchatColor;
-                              break;
-                            default:
-                              platformColor = ColorConstants.bottomBar;
-                          }
-
-                          return GestureDetector(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 22)),
+                  const SizedBox(height: 18),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 16,
+                    children: [
+                      ...[...platforms, ...newPlatforms].toSet().map((platform) {
+                        IconData icon = platformIcons[platform]!;
+                        Color iconColor = platformBrandColors[platform] ?? Colors.black;
+                        return SizedBox(
+                          width: 60,
+                          child: GestureDetector(
                             onTap: () {
                               selectGalleryImageForSocialMedia(context, platform);
                             },
-                            child: Container(
-                              height: 50,
-                              width: 50,
-                              margin: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: platformColor,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Center(
-                                  child: FaIcon(icon,
-                                      size: 30,
-                                      color: ColorConstants.primaryColor)),
+                            child: Column(
+                              children: [
+                                Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Center(
+                                    child: FaIcon(icon, size: 40, color: iconColor),
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        }),
-                  ),
-                  SizedBox(
-                    height: 60,
-                    width: double.infinity,
-                    child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: newPlatforms.length,
-                        itemBuilder: (context, index) {
-                          String platform = newPlatforms[index];
-                          IconData icon = platformIcons[platform]!;
-
-                          Color platformColor;
-                          Color? iconColor;
-                          switch (platform) {
-                            case 'Facebook':
-                              platformColor = ColorConstants.facebookColor;
-                              break;
-                            case 'Instagram':
-                              platformColor = ColorConstants.instagramColor;
-                              break;
-                            case 'Twitter':
-                              platformColor = ColorConstants.twitterColor;
-                              break;
-                            case 'WhatsApp':
-                              platformColor = ColorConstants.whatsAppColor;
-                              break;
-                            case 'LinkedIn':
-                              platformColor = ColorConstants.linkedInColor;
-                              break;
-                            case 'Pinterest':
-                              platformColor = ColorConstants.pinterestColor;
-                              iconColor = ColorConstants.primaryColor;
-                              break;
-                            case 'Snapchat':
-                              platformColor = ColorConstants.snapchatColor;
-                              iconColor = ColorConstants.secondaryColor;
-                              break;
-                            default:
-                              platformColor = ColorConstants.bottomBar;
-                          }
-
-                          return GestureDetector(
-                            onTap: () {
-                              selectGalleryImageForSocialMedia(context, platform);
-                            },
-                            child: Container(
-                              height: 50,
-                              width: 50,
-                              margin: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: platformColor,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Center(
-                                  child:
-                                      FaIcon(icon, size: 30, color: iconColor)),
-                            ),
-                          );
-                        }),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ],
               ),
@@ -355,7 +296,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               GestureDetector(
                                 onTap: () {
-
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CollageMaker(),
+                                    ),
+                                  );
                                 },
                                 child: Container(
                                   height: 80,
@@ -366,7 +312,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: const Center(
-                                      child: Image(image: AssetImage("assets/collage.png"), width: 30, height: 30),
+                                    child: Image(
+                                        image: AssetImage("assets/collage.png"),
+                                        width: 30,
+                                        height: 30),
                                   ),
                                 ),
                               ),
@@ -380,7 +329,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           Column(
                             children: [
                               GestureDetector(
-                                onTap: () {},
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CompressScreen(),
+                                    ),
+                                  );
+                                },
                                 child: Container(
                                   height: 80,
                                   width: 80,
@@ -390,10 +346,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                     borderRadius: BorderRadius.circular(100),
                                   ),
                                   child: const Center(
-                                      child: Image(image: AssetImage("assets/image_compress.png"), width: 30, height: 30),
-                                      // FaIcon(FontAwesomeIcons.compress,
-                                      //     size: 30,
-                                      //     color: ColorConstants.primaryColor)
+                                    child: Image(
+                                        image: AssetImage(
+                                            "assets/image_compress.png"),
+                                        width: 30,
+                                        height: 30),
                                   ),
                                 ),
                               ),
