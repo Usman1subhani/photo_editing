@@ -20,7 +20,8 @@ class ResizeScreen extends StatefulWidget {
 
 class _ResizeScreenState extends State<ResizeScreen> {
   final GlobalKey _previewKey = GlobalKey();
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   final resizerImage = FlutterResizerImage.instance();
 
   bool isSaving = false;
@@ -59,15 +60,32 @@ class _ResizeScreenState extends State<ResizeScreen> {
 
     // Pinterest
     {'label': 'Pinterest Pin', 'width': 1000, 'height': 1500, 'aspect': 2 / 3},
-    {'label': 'Pinterest Story', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+    {
+      'label': 'Pinterest Story',
+      'width': 1080,
+      'height': 1920,
+      'aspect': 9 / 16
+    },
 
     // LinkedIn
-    {'label': 'LinkedIn Post', 'width': 1200, 'height': 627, 'aspect': 1.91 / 1},
+    {
+      'label': 'LinkedIn Post',
+      'width': 1200,
+      'height': 627,
+      'aspect': 1.91 / 1
+    },
     {'label': 'LinkedIn Cover', 'width': 1584, 'height': 396, 'aspect': 4 / 1},
-    {'label': 'LinkedIn Story', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+    {
+      'label': 'LinkedIn Story',
+      'width': 1080,
+      'height': 1920,
+      'aspect': 9 / 16
+    },
 
     // YouTube
-    {'label': 'YouTube Thumbnail','width': 1280,
+    {
+      'label': 'YouTube Thumbnail',
+      'width': 1280,
       'height': 720,
       'aspect': 16 / 9
     },
@@ -102,14 +120,14 @@ class _ResizeScreenState extends State<ResizeScreen> {
     {'label': 'Telegram Post', 'width': 1080, 'height': 1080, 'aspect': 1.0},
   ];
 
-
   Future<File> cropAndResizeVisibleArea(int width, int height) async {
     try {
       Uint8List imageData = await widget.imageFile.readAsBytes();
       img.Image? decoded = img.decodeImage(imageData);
       if (decoded == null) throw Exception('Failed to decode image');
 
-      final RenderBox? renderBox = _previewKey.currentContext?.findRenderObject() as RenderBox?;
+      final RenderBox? renderBox =
+          _previewKey.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox == null) throw Exception('Preview not ready');
 
       final Size previewSize = renderBox.size;
@@ -162,7 +180,8 @@ class _ResizeScreenState extends State<ResizeScreen> {
       );
 
       Uint8List pngBytes = Uint8List.fromList(img.encodePng(resized));
-      final String path = '${Directory.systemTemp.path}/frame_crop_${DateTime.now().millisecondsSinceEpoch}.png';
+      final String path =
+          '${Directory.systemTemp.path}/frame_crop_${DateTime.now().millisecondsSinceEpoch}.png';
       File output = File(path)..writeAsBytesSync(pngBytes);
       return output;
     } catch (e) {
@@ -224,11 +243,13 @@ class _ResizeScreenState extends State<ResizeScreen> {
             )
           else
             IconButton(
-              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              icon:
+                  const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
               onPressed: () async {
                 File finalFile = imageToShow;
                 if (option['width'] != null && option['height'] != null) {
-                  finalFile = await cropAndResizeVisibleArea(option['width'], option['height']);
+                  finalFile = await cropAndResizeVisibleArea(
+                      option['width'], option['height']);
                 }
                 await _saveImageToGallery(finalFile);
                 if (mounted) Navigator.pop(context, finalFile);
@@ -243,32 +264,31 @@ class _ResizeScreenState extends State<ResizeScreen> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: aspect,
-                child: Container(
-                  key: _previewKey,
-                  color: Colors.white,
-                  child: Stack(
-                    children: [
-                      InteractiveViewer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    RepaintBoundary(
+                      key: _previewKey,
+                      child: InteractiveViewer(
                         transformationController: _transformationController,
                         minScale: 1,
                         maxScale: 4,
-                        child: Image.file(imageToShow, fit: BoxFit.contain),
-                      ),
-                      IgnorePointer(
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: aspect,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.blueAccent, width: 2.5),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
+                        child: Image.file(
+                          imageToShow,
+                          fit: BoxFit.contain,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border:
+                              Border.all(color: Colors.blueAccent, width: 2.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -283,7 +303,13 @@ class _ResizeScreenState extends State<ResizeScreen> {
               itemBuilder: (context, index) {
                 final isSelected = selectedOption == index;
                 return GestureDetector(
-                  onTap: () => setState(() => selectedOption = index),
+                  onTap: () {
+                    setState(() {
+                      selectedOption = index;
+                      // 👇 DO NOT reset the transformation controller
+                      // _transformationController.value = Matrix4.identity(); ❌ REMOVE THIS
+                    });
+                  },
                   child: Container(
                     width: 70,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -295,7 +321,9 @@ class _ResizeScreenState extends State<ResizeScreen> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white24 : Colors.transparent,
+                            color: isSelected
+                                ? Colors.white24
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: resizeOptions[index]['aspect'] == null
@@ -303,7 +331,8 @@ class _ResizeScreenState extends State<ResizeScreen> {
                               : CustomPaint(
                                   painter: _AspectRatioPainter(
                                     aspectRatio: resizeOptions[index]['aspect'],
-                                    color: isSelected ? Colors.white : Colors.grey,
+                                    color:
+                                        isSelected ? Colors.white : Colors.grey,
                                   ),
                                 ),
                         ),

@@ -1,17 +1,13 @@
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:cropmeapp/Constants/color_constants.dart';
-import 'package:cropmeapp/Constants/image_constants.dart';
-import 'package:cropmeapp/Screens/Compress.dart';
-import 'package:cropmeapp/Screens/collageMaker.dart';
-import 'package:cropmeapp/Screens/editImage.dart';
-import 'package:cropmeapp/Screens/resizeScreen.dart';
-import 'package:cropmeapp/Screens/resizeWithPlatform.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:image_editor_plus/image_editor_plus.dart';
+import 'dart:io'; 
+import 'package:flutter/material.dart'; 
 import 'package:image_picker/image_picker.dart';
+import 'package:cropmeapp/Screens/Compress.dart';
+import 'package:cropmeapp/Screens/editImage.dart';
+import 'package:cropmeapp/Screens/collageMaker.dart';
+import 'package:cropmeapp/Screens/resizeScreen.dart';
+import 'package:cropmeapp/Constants/color_constants.dart'; 
+import 'package:cropmeapp/Screens/resizeWithPlatform.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,8 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   final List<String> newPlatforms = [
     'LinkedIn',
-    'WhatsApp',
-    'Telegram',
+    'WhatsApp', 
     'Snapchat',
     'Pinterest', // Only in newPlatforms, not in platforms
   ];
@@ -48,8 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'Snapchat': FontAwesomeIcons.snapchat,
     'Twitter': FontAwesomeIcons.twitter,
     'LinkedIn': FontAwesomeIcons.linkedin,
-    'Pinterest': FontAwesomeIcons.pinterest,
-    'Telegram': FontAwesomeIcons.telegram,
+    'Pinterest': FontAwesomeIcons.pinterest, 
   };
 
   final Map<String, Color> platformBrandColors = {
@@ -59,8 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'YouTube': const Color(0xFFFF0000),
     'Twitter': const Color(0xFF1DA1F2),
     'LinkedIn': const Color(0xFF0A66C2),
-    'WhatsApp': const Color(0xFF25D366),
-    'Telegram': const Color(0xFF229ED9),
+    'WhatsApp': const Color(0xFF25D366), 
     'Snapchat': const Color(0xFFFFFC00),
     'Pinterest': const Color(0xFFE60023),
   };
@@ -299,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => CollageMaker(),
+                                      builder: (context) => const CollageScreen(),
                                     ),
                                   );
                                 },

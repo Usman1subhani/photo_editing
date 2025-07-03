@@ -4,15 +4,36 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class CompressScreen extends StatefulWidget {
-  const CompressScreen({Key? key}) : super(key: key);
+  final File? initialImageFile;
+  const CompressScreen({Key? key, this.initialImageFile}) : super(key: key);
 
   @override
   State<CompressScreen> createState() => _CompressScreenState();
 }
 
 class _CompressScreenState extends State<CompressScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialImageFile != null) {
+      _imageFile = widget.initialImageFile;
+      widget.initialImageFile!.readAsBytes().then((bytes) {
+        setState(() {
+          _originalSize = bytes.lengthInBytes;
+        });
+      });
+    } else {
+      // If no image provided, open gallery immediately
+      Future.delayed(Duration.zero, _pickImage);
+    }
+  }
+
+  bool _showBorder = true;
   File? _imageFile;
   Uint8List? _compressedBytes;
   int? _originalSize;
@@ -69,7 +90,6 @@ class _CompressScreenState extends State<CompressScreen> {
       );
       return;
     }
-    // Resize to 50% of original dimensions
     final resized = img.copyResize(image, width: (image.width * 0.5).round());
     final resizedBytes = img.encodeJpg(resized, quality: 90);
     setState(() {
@@ -79,101 +99,174 @@ class _CompressScreenState extends State<CompressScreen> {
     });
   }
 
+  Future<void> _saveCompressedToGallery() async {
+    if (_compressedBytes == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please compress the image before saving.')),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus(); // Dismiss keyboard if open
+
+    // Request correct permissions for Android/iOS
+    PermissionStatus status = await Permission.photos.request();
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+    }
+    if (!status.isGranted) {
+      setState(() => _showBorder = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Gallery/storage permission not granted. Please enable it in app settings.')),
+      );
+      return;
+    }
+    try {
+      final result = await ImageGallerySaver.saveImage(_compressedBytes!,
+          name: 'compressed_${DateTime.now().millisecondsSinceEpoch}');
+      setState(() => _showBorder = true);
+      if (result['isSuccess'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image saved to gallery')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save image.')),
+        );
+      }
+    } catch (e) {
+      setState(() => _showBorder = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error saving image: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Compress Image'),
-        backgroundColor: Colors.black,
-      ),
       backgroundColor: Colors.black,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: _pickImage,
-                icon: const Icon(Icons.photo_library),
-                label: const Text('Select Image'),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        leading: BackButton(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+            onPressed:
+                _compressedBytes == null ? null : _saveCompressedToGallery,
+            tooltip: _compressedBytes == null ? 'Compress image first' : 'Save',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          const SizedBox(height: 12),
+          if (_imageFile != null)
+            Expanded(
+              child: Center(
+                child: _compressedBytes != null || _imageFile != null
+                    ? Container(
+                        decoration: _showBorder
+                            ? BoxDecoration(
+                                border: Border.all(
+                                    color: Colors.blueAccent, width: 2.5),
+                                borderRadius: BorderRadius.circular(10),
+                              )
+                            : null,
+                        clipBehavior: Clip.hardEdge,
+                        child: InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Builder(
+                            builder: (_) {
+                              try {
+                                if (_compressedBytes != null) {
+                                  return Image.memory(
+                                    _compressedBytes!,
+                                    key: const ValueKey('compressedImage'),
+                                    fit: BoxFit.contain,
+                                  );
+                                } else {
+                                  return Image.file(_imageFile!,
+                                      fit: BoxFit.contain);
+                                }
+                              } catch (e) {
+                                return const Center(
+                                  child: Text(
+                                    'Error displaying image',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            )
+          else
+            const Expanded(
+              child: Center(
+                child: CircularProgressIndicator(color: Colors.blueAccent),
+              ),
+            ),
+          if (_originalSize != null || _compressedSize != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                children: [
+                  if (_originalSize != null)
+                    Text(
+                      'Original Size: ${(_originalSize! / 1024).toStringAsFixed(2)} KB',
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                    ),
+                  if (_compressedSize != null)
+                    Text(
+                      'Compressed Size: ${(_compressedSize! / 1024).toStringAsFixed(2)} KB',
+                      style: const TextStyle(
+                          color: Colors.greenAccent, fontSize: 14),
+                    ),
+                ],
+              ),
+            ),
+          Container(
+            height: 90,
+            color: Colors.grey[900],
+            child: Center(
+              child: ElevatedButton.icon(
+                onPressed: _isCompressing || _imageFile == null
+                    ? null
+                    : _compressImage,
+                icon:
+                    const Icon(FontAwesomeIcons.compress, color: Colors.white),
+                label: _isCompressing
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: CircularProgressIndicator(color: Colors.white),
+                      )
+                    : const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('Compress',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
+                      ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
+                  backgroundColor: Colors.green.shade700,
                   foregroundColor: Colors.white,
+                  minimumSize: const Size(180, 55),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 6,
+                  shadowColor: Colors.greenAccent,
                 ),
               ),
-              const SizedBox(height: 20),
-              if (_imageFile != null)
-                Column(
-                  children: [
-                    if (_originalSize != null)
-                      Text(
-                        'Original Size: ${(_originalSize! / 1024).toStringAsFixed(2)} KB',
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    const SizedBox(height: 10),
-                    Container(
-                      width: 250,
-                      height: 250,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.blueAccent, width: 2),
-                        borderRadius: BorderRadius.circular(16),
-                        color: Colors.white,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.memory(
-                          _compressedBytes ?? _imageFile!.readAsBytesSync(),
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_compressedSize != null)
-                      Text(
-                        'Compressed Size: ${(_compressedSize! / 1024).toStringAsFixed(2)} KB',
-                        style: const TextStyle(color: Colors.greenAccent, fontSize: 16),
-                      ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton(
-                          onPressed: _isCompressing ? null : _compressImage,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isCompressing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Compress'),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: _isCompressing ? null : _resizeImage,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: _isCompressing
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('Resize 50%'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

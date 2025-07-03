@@ -15,21 +15,24 @@ class ResizeWithPlatform extends StatefulWidget {
   final File imageFile;
   final String platform;
 
-  const ResizeWithPlatform({super.key, required this.imageFile, required this.platform});
+  const ResizeWithPlatform(
+      {super.key, required this.imageFile, required this.platform});
 
   @override
   State<ResizeWithPlatform> createState() => _ResizeWithPlatformState();
 }
 
 class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
-  final TransformationController _transformationController = TransformationController();
+  final TransformationController _transformationController =
+      TransformationController();
   final GlobalKey _previewKey = GlobalKey();
   int selectedOption = 0;
   bool isSaving = false;
 
   Future<File> captureRenderedImageAndResize(int width, int height) async {
     try {
-      RenderRepaintBoundary boundary = _previewKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      RenderRepaintBoundary boundary = _previewKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
       var image = await boundary.toImage(pixelRatio: 3.0);
       ByteData? byteData = await image.toByteData(format: ImageByteFormat.png);
       Uint8List pngBytes = byteData!.buffer.asUint8List();
@@ -40,7 +43,8 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
       Uint8List resizedBytes = Uint8List.fromList(img.encodePng(resized));
 
       final Directory tempDir = Directory.systemTemp;
-      final String tempPath = '${tempDir.path}/final_rendered_image_${DateTime.now().millisecondsSinceEpoch}.png';
+      final String tempPath =
+          '${tempDir.path}/final_rendered_image_${DateTime.now().millisecondsSinceEpoch}.png';
       File resizedFile = File(tempPath)..writeAsBytesSync(resizedBytes);
       return resizedFile;
     } catch (e) {
@@ -49,7 +53,7 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
     }
   }
 
-    // Platform-specific size options
+  // Platform-specific size options
   final Map<String, List<Map<String, dynamic>>> platformOptions = {
     'Facebook': [
       {'label': 'Profile', 'width': 180, 'height': 180, 'aspect': 1.0},
@@ -70,15 +74,35 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
     ],
     'TikTok': [
       {'label': 'Profile', 'width': 20, 'height': 20, 'aspect': 1.0},
-      {'label': 'Virtical Image AD', 'width': 540, 'height': 960, 'aspect': 0.56 / 1},
+      {
+        'label': 'Virtical Image AD',
+        'width': 540,
+        'height': 960,
+        'aspect': 0.56 / 1
+      },
       {'label': 'Square Image AD', 'width': 640, 'height': 640, 'aspect': 1.1},
-      {'label': 'Landscape Image AD', 'width': 960, 'height': 540, 'aspect': 16 / 9},
+      {
+        'label': 'Landscape Image AD',
+        'width': 960,
+        'height': 540,
+        'aspect': 16 / 9
+      },
       {'label': 'Video', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
     ],
     'YouTube': [
       {'label': 'Profile', 'width': 800, 'height': 800, 'aspect': 1.0},
-      {'label': 'Channel Cover', 'width': 2560, 'height': 1440, 'aspect': 16 / 9},
-      {'label': 'Video Thumbnail', 'width': 1280, 'height': 720, 'aspect': 16 / 9},
+      {
+        'label': 'Channel Cover',
+        'width': 2560,
+        'height': 1440,
+        'aspect': 16 / 9
+      },
+      {
+        'label': 'Video Thumbnail',
+        'width': 1280,
+        'height': 720,
+        'aspect': 16 / 9
+      },
       {'label': 'Video', 'width': 1080, 'height': 1920, 'aspect': 16 / 9},
     ],
     'Twitter': [
@@ -101,7 +125,12 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
       {'label': 'Profile', 'width': 400, 'height': 400, 'aspect': 1.0},
       {'label': 'Cover', 'width': 1128, 'height': 191, 'aspect': 5.91 / 1},
       {'label': 'Post', 'width': 1200, 'height': 627, 'aspect': 1.91 / 1},
-      {'label': 'Sponsored Carousel', 'width': 1080, 'height': 1080, 'aspect': 1 / 1},
+      {
+        'label': 'Sponsored Carousel',
+        'width': 1080,
+        'height': 1080,
+        'aspect': 1 / 1
+      },
     ],
     'WhatsApp': [
       {'label': 'Profile', 'width': 192, 'height': 192, 'aspect': 1.0},
@@ -114,7 +143,12 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
     'Pinterest': [
       {'label': 'Profile', 'width': 165, 'height': 165, 'aspect': 1.0},
       {'label': 'Profile Cover', 'width': 800, 'height': 450, 'aspect': 16 / 9},
-      {'label': 'Standard Pins', 'width': 1000, 'height': 1500, 'aspect': 2 / 3},
+      {
+        'label': 'Standard Pins',
+        'width': 1000,
+        'height': 1500,
+        'aspect': 2 / 3
+      },
       {'label': 'Square Pins', 'width': 1000, 'height': 1000, 'aspect': 1 / 1},
       {'label': 'Story Pins', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
       {'label': 'Board Cover', 'width': 222, 'height': 150, 'aspect': 37 / 25},
@@ -136,8 +170,10 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
         if (status.isPermanentlyDenied) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Storage permission permanently denied. Please enable it in app settings.'),
-              action: SnackBarAction(label: 'Settings', onPressed: () => openAppSettings()),
+              content: const Text(
+                  'Storage permission permanently denied. Please enable it in app settings.'),
+              action: SnackBarAction(
+                  label: 'Settings', onPressed: () => openAppSettings()),
             ),
           );
         } else {
@@ -175,7 +211,9 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
   @override
   Widget build(BuildContext context) {
     final options = platformOptions[widget.platform] ?? [];
-    final double aspect = selectedOption < options.length ? options[selectedOption]['aspect'] ?? 1.0 : 1.0;
+    final double aspect = selectedOption < options.length
+        ? options[selectedOption]['aspect'] ?? 1.0
+        : 1.0;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -185,7 +223,8 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(widget.platform, style: const TextStyle(color: Colors.white)),
+        title:
+            Text(widget.platform, style: const TextStyle(color: Colors.white)),
         centerTitle: true,
         actions: [
           if (isSaving)
@@ -195,11 +234,13 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             )
           else
             IconButton(
-              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              icon:
+                  const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
               onPressed: () async {
                 if (selectedOption < options.length) {
                   final option = options[selectedOption];
-                  File imageToSave = await captureRenderedImageAndResize(option['width'], option['height']);
+                  File imageToSave = await captureRenderedImageAndResize(
+                      option['width'], option['height']);
                   await _saveImageToGallery(imageToSave);
                   if (mounted) {
                     Navigator.pop(context, imageToSave);
@@ -216,12 +257,12 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             child: Center(
               child: AspectRatio(
                 aspectRatio: aspect,
-                child: RepaintBoundary(
-                  key: _previewKey,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      InteractiveViewer(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    RepaintBoundary(
+                      key: _previewKey,
+                      child: InteractiveViewer(
                         transformationController: _transformationController,
                         minScale: 1,
                         maxScale: 4,
@@ -230,21 +271,18 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                           fit: BoxFit.contain,
                         ),
                       ),
-                      IgnorePointer(
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: aspect,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(color: Colors.blueAccent, width: 2.5),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
+                    ),
+                    // Visual frame overlay (not inside RepaintBoundary)
+                    IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border:
+                              Border.all(color: Colors.blueAccent, width: 2.5),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -255,7 +293,9 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             decoration: BoxDecoration(
               color: Colors.grey[900],
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 6)
+              ],
             ),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -274,13 +314,16 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+                            color: isSelected
+                                ? Colors.white.withOpacity(0.2)
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: CustomPaint(
                             painter: _AspectRatioPainter(
                               aspectRatio: option['aspect'],
-                              color: isSelected ? Colors.white : Colors.grey[400]!,
+                              color:
+                                  isSelected ? Colors.white : Colors.grey[400]!,
                             ),
                           ),
                         ),
