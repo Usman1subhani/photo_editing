@@ -17,6 +17,36 @@ class CompressScreen extends StatefulWidget {
 }
 
 class _CompressScreenState extends State<CompressScreen> {
+  // Modal loader dialog (consistent with other screens)
+  Future<void> _showSavingDialog([String message = "Saving..."]) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black87,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Colors.white),
+              const SizedBox(height: 24),
+              Text(message, style: const TextStyle(color: Colors.white, fontSize: 18)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _showBorder = true;
+  File? _imageFile;
+  Uint8List? _compressedBytes;
+  int? _originalSize;
+  int? _compressedSize;
+  bool _isCompressing = false;
+
   @override
   void initState() {
     super.initState();
@@ -32,13 +62,6 @@ class _CompressScreenState extends State<CompressScreen> {
       Future.delayed(Duration.zero, _pickImage);
     }
   }
-
-  bool _showBorder = true;
-  File? _imageFile;
-  Uint8List? _compressedBytes;
-  int? _originalSize;
-  int? _compressedSize;
-  bool _isCompressing = false;
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
@@ -102,11 +125,11 @@ class _CompressScreenState extends State<CompressScreen> {
   Future<void> _saveCompressedToGallery() async {
     if (_compressedBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please compress the image before saving.')),
+        const SnackBar(content: Text('Please compress the image before saving.')),
       );
       return;
     }
+    _showSavingDialog();
     FocusScope.of(context).unfocus(); // Dismiss keyboard if open
 
     // Request correct permissions for Android/iOS
@@ -116,6 +139,7 @@ class _CompressScreenState extends State<CompressScreen> {
     }
     if (!status.isGranted) {
       setState(() => _showBorder = true);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
@@ -127,6 +151,7 @@ class _CompressScreenState extends State<CompressScreen> {
       final result = await ImageGallerySaver.saveImage(_compressedBytes!,
           name: 'compressed_${DateTime.now().millisecondsSinceEpoch}');
       setState(() => _showBorder = true);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
       if (result['isSuccess'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image saved to gallery')),
@@ -138,6 +163,7 @@ class _CompressScreenState extends State<CompressScreen> {
       }
     } catch (e) {
       setState(() => _showBorder = true);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving image: $e')),
       );

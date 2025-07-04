@@ -21,6 +21,34 @@ class ResizeWithPlatform extends StatefulWidget {
 }
 
 class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
+  bool showBorder = true;
+  void _showSavingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: SizedBox(
+          width: 120,
+          height: 120,
+          child: Card(
+            color: Colors.black87,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Colors.greenAccent),
+                  SizedBox(height: 16),
+                  Text('Saving...', style: TextStyle(color: Colors.white, fontSize: 16)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
   final TransformationController _transformationController =
       TransformationController();
   final GlobalKey _previewKey = GlobalKey();
@@ -221,8 +249,7 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title:
-            Text(widget.platform, style: const TextStyle(color: Colors.white)),
+        title: Text(widget.platform, style: const TextStyle(color: Colors.white)),
         centerTitle: true,
         actions: [
           if (isSaving)
@@ -232,17 +259,18 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             )
           else
             IconButton(
-              icon:
-                  const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
               onPressed: () async {
+                _showSavingDialog();
+                setState(() => showBorder = false);
+                await Future.delayed(const Duration(milliseconds: 50));
                 if (selectedOption < options.length) {
                   final option = options[selectedOption];
-                  File imageToSave = await captureRenderedImageAndResize(
-                      option['width'], option['height']);
+                  File imageToSave = await captureRenderedImageAndResize(option['width'], option['height']);
                   await _saveImageToGallery(imageToSave);
-                  if (mounted) {
-                    Navigator.pop(context, imageToSave);
-                  }
+                  setState(() => showBorder = true);
+                  if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
+                  if (mounted) Navigator.pop(context, imageToSave);
                 }
               },
             ),
@@ -270,16 +298,15 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                         ),
                       ),
                     ),
-                    // Visual frame overlay (not inside RepaintBoundary)
-                    IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border:
-                              Border.all(color: Colors.blueAccent, width: 2.5),
-                          borderRadius: BorderRadius.circular(10),
+                    if (showBorder)
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.blueAccent, width: 2.5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -320,8 +347,7 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                           child: CustomPaint(
                             painter: _AspectRatioPainter(
                               aspectRatio: option['aspect'],
-                              color:
-                                  isSelected ? Colors.white : Colors.grey[400]!,
+                              color: isSelected ? Colors.white : Colors.grey[400]!,
                             ),
                           ),
                         ),
