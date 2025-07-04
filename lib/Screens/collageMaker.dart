@@ -1,5 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 
 class CollageScreen extends StatefulWidget {
   const CollageScreen({Key? key}) : super(key: key);
@@ -10,9 +11,55 @@ class CollageScreen extends StatefulWidget {
 
 class _CollageScreenState extends State<CollageScreen> {
   int selectedFrameIndex = 0;
+  List<File?> images = List.generate(4, (index) => null); // supports up to 4-grid
 
-  // Placeholder for frame templates
-  final List<String> frameTypes = ['2-grid', '3-grid', '4-grid', 'Custom']; // You can later use custom widgets
+  final picker = ImagePicker();
+
+  Future<void> _pickImage(int index) async {
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() => images[index] = File(pickedFile.path));
+    }
+  }
+
+  Widget _buildFrame() {
+    switch (selectedFrameIndex) {
+      case 0:
+        return Row(
+          children: [0, 1].map((i) => _buildImageBox(i)).toList(),
+        );
+      case 1:
+        return Column(
+          children: [0, 1, 2].map((i) => _buildImageBox(i)).toList(),
+        );
+      case 2:
+        return GridView.count(
+          crossAxisCount: 2,
+          children: List.generate(4, (i) => _buildImageBox(i)),
+          shrinkWrap: true,
+        );
+      default:
+        return Center(child: Text('Custom Frame'));
+    }
+  }
+
+  Widget _buildImageBox(int index) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _pickImage(index),
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white, width: 1),
+            color: Colors.grey[800],
+          ),
+          child: images[index] == null
+              ? const Icon(Icons.add, color: Colors.white)
+              : Image.file(images[index]!, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,9 +70,9 @@ class _CollageScreenState extends State<CollageScreen> {
         leading: const BackButton(color: Colors.white),
         actions: [
           IconButton(
-            icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+            icon: const Icon(Icons.check, color: Colors.greenAccent),
             onPressed: () {
-              // TODO: Save/Export Collage Logic
+              // TODO: Export/save logic
             },
           )
         ],
@@ -33,39 +80,28 @@ class _CollageScreenState extends State<CollageScreen> {
       body: Column(
         children: [
           const SizedBox(height: 12),
-
-          // 🖼 Collage Frame Area
           Expanded(
             child: Center(
-              child: Container(
-                width: MediaQuery.of(context).size.width * 0.9,
-                height: MediaQuery.of(context).size.width * 0.9,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.blueAccent, width: 2.5),
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                ),
-                child: Center(
-                  child: Text(
-                    'Frame: ${frameTypes[selectedFrameIndex]}',
-                    style: const TextStyle(color: Colors.black87, fontSize: 18),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blueAccent, width: 2.5),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: _buildFrame(),
                 ),
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // 🔳 Bottom Frame Options
           Container(
             height: 90,
             color: Colors.grey[900],
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              itemCount: frameTypes.length,
+              itemCount: 3,
               itemBuilder: (context, index) {
-                final isSelected = selectedFrameIndex == index;
                 return GestureDetector(
                   onTap: () => setState(() => selectedFrameIndex = index),
                   child: Container(
@@ -73,18 +109,25 @@ class _CollageScreenState extends State<CollageScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 6),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.white24 : Colors.transparent,
+                      color: selectedFrameIndex == index
+                          ? Colors.white24
+                          : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.grid_on, color: isSelected ? Colors.white : Colors.grey),
+                        Icon(Icons.grid_on,
+                            color: selectedFrameIndex == index
+                                ? Colors.white
+                                : Colors.grey),
                         const SizedBox(height: 6),
                         Text(
-                          frameTypes[index],
+                          '${index + 2}-Grid',
                           style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey,
+                            color: selectedFrameIndex == index
+                                ? Colors.white
+                                : Colors.grey,
                             fontSize: 12,
                           ),
                         ),
