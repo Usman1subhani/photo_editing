@@ -1,9 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 
 class CollageScreen extends StatefulWidget {
-  const CollageScreen({Key? key}) : super(key: key);
+  const CollageScreen({super.key});
 
   @override
   State<CollageScreen> createState() => _CollageScreenState();
@@ -11,7 +12,15 @@ class CollageScreen extends StatefulWidget {
 
 class _CollageScreenState extends State<CollageScreen> {
   int selectedFrameIndex = 0;
-  List<File?> images = List.generate(4, (index) => null); // supports up to 4-grid
+  List<File?> images = List.generate(6, (index) => null); // Up to 6 images
+  final List<String> frameNames = [
+    "2-H",
+    "3-V",
+    "2x2",
+    "3-H",
+    "Big+2",
+    "Staggered",
+  ];
 
   final picker = ImagePicker();
 
@@ -24,22 +33,76 @@ class _CollageScreenState extends State<CollageScreen> {
 
   Widget _buildFrame() {
     switch (selectedFrameIndex) {
-      case 0:
+      case 0: // 2-grid horizontal
         return Row(
           children: [0, 1].map((i) => _buildImageBox(i)).toList(),
         );
-      case 1:
+
+      case 1: // 3-grid vertical
         return Column(
           children: [0, 1, 2].map((i) => _buildImageBox(i)).toList(),
         );
-      case 2:
+
+      case 2: // 2x2 grid
         return GridView.count(
           crossAxisCount: 2,
           children: List.generate(4, (i) => _buildImageBox(i)),
           shrinkWrap: true,
         );
+
+      case 3: // 3-horizontal
+        return Row(
+          children: [0, 1, 2].map((i) => _buildImageBox(i)).toList(),
+        );
+
+      case 4: // 1 big left + 2 stacked right
+        return Row(
+          children: [
+            Expanded(flex: 2, child: _buildImageBox(0)),
+            Expanded(
+              flex: 1,
+              child: Column(
+                children: [
+                  Expanded(child: _buildImageBox(1)),
+                  Expanded(child: _buildImageBox(2)),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 5: // Staggered layout
+        return Padding(
+          padding: const EdgeInsets.all(4.0),
+          child: MasonryGridView.count(
+            crossAxisCount: 2,
+            itemCount: 6,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 4,
+            crossAxisSpacing: 4,
+            itemBuilder: (context, index) {
+              return GestureDetector(
+                onTap: () => _pickImage(index),
+                child: Container(
+                  height: (index % 2 == 0) ? 120 : 180,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800],
+                    border: Border.all(color: Colors.white),
+                  ),
+                  child: images[index] == null
+                      ? const Icon(Icons.add, color: Colors.white)
+                      : Image.file(images[index]!, fit: BoxFit.cover),
+                ),
+              );
+            },
+          ),
+        );
+
       default:
-        return Center(child: Text('Custom Frame'));
+        return const Center(
+            child: Text('Invalid frame index',
+                style: TextStyle(color: Colors.white)));
     }
   }
 

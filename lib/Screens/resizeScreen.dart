@@ -205,6 +205,7 @@ class _ResizeScreenState extends State<ResizeScreen> {
       );
 
       if (result['isSuccess'] == true) {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Image saved!')),
         );
