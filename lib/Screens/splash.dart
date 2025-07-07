@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:cropmeapp/Constants/color_constants.dart';
 import 'package:cropmeapp/Constants/image_constants.dart';
 import 'package:flutter/material.dart';

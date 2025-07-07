@@ -22,28 +22,41 @@ class ResizeWithPlatform extends StatefulWidget {
 
 class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
   bool showBorder = true;
-  void _showSavingDialog() {
-    showDialog(
+  // Modern loader dialog with Material 3 styling and theme adaptation
+  Future<void> _showSavingDialog([String message = "Saving..."]) async {
+    final theme = Theme.of(context);
+    return showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: SizedBox(
-          width: 120,
-          height: 120,
-          child: Card(
-            color: Colors.black87,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16))),
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.greenAccent),
-                  SizedBox(height: 16),
-                  Text('Saving...', style: TextStyle(color: Colors.white, fontSize: 16)),
-                ],
+      builder: (context) => Dialog(
+        backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.7, end: 1.0),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeInOut,
+                builder: (context, scale, child) => Transform.scale(
+                  scale: scale,
+                  child: CircularProgressIndicator(
+                    color: theme.colorScheme.primary,
+                    strokeWidth: 5,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
+              Text(
+                message,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -236,32 +249,35 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final options = platformOptions[widget.platform] ?? [];
     final double aspect = selectedOption < options.length
         ? options[selectedOption]['aspect'] ?? 1.0
         : 1.0;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(widget.platform, style: const TextStyle(color: Colors.white)),
+        title: Text(widget.platform, style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onSurface)),
         centerTitle: true,
         actions: [
           if (isSaving)
-            const Padding(
-              padding: EdgeInsets.all(12.0),
-              child: CircularProgressIndicator(color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: CircularProgressIndicator(color: theme.colorScheme.primary),
             )
           else
             IconButton(
-              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              icon: Icon(FontAwesomeIcons.check, color: theme.colorScheme.secondary, size: 22),
+              tooltip: 'Save',
               onPressed: () async {
-                _showSavingDialog();
+                await _showSavingDialog();
                 setState(() => showBorder = false);
                 await Future.delayed(const Duration(milliseconds: 50));
                 if (selectedOption < options.length) {
@@ -276,98 +292,128 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 20),
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: aspect,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    RepaintBoundary(
-                      key: _previewKey,
-                      child: InteractiveViewer(
-                        transformationController: _transformationController,
-                        minScale: 1,
-                        maxScale: 4,
-                        child: Image.file(
-                          widget.imageFile,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    if (showBorder)
-                      IgnorePointer(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.blueAccent, width: 2.5),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            height: 100,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey[900],
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 6)
-              ],
-            ),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: options.length,
-              itemBuilder: (context, index) {
-                final option = options[index];
-                final isSelected = selectedOption == index;
-                return GestureDetector(
-                  onTap: () => setState(() => selectedOption = index),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withOpacity(0.2)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: CustomPaint(
-                            painter: _AspectRatioPainter(
-                              aspectRatio: option['aspect'],
-                              color: isSelected ? Colors.white : Colors.grey[400]!,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Column(
+              children: [
+                const SizedBox(height: 20),
+                Expanded(
+                  child: Center(
+                    child: AspectRatio(
+                      aspectRatio: aspect,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          RepaintBoundary(
+                            key: _previewKey,
+                            child: InteractiveViewer(
+                              transformationController: _transformationController,
+                              minScale: 1,
+                              maxScale: 4,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: Image.file(
+                                  widget.imageFile,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          option['label'],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey[400],
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                          if (showBorder)
+                            IgnorePointer(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: theme.colorScheme.primary, width: 2.5),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 80),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceVariant,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    boxShadow: [
+                      BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2)),
+                    ],
+                  ),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final option = options[index];
+                      final isSelected = selectedOption == index;
+                      return GestureDetector(
+                        onTap: () => setState(() => selectedOption = index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? theme.colorScheme.primary.withOpacity(0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isSelected
+                                ? Border.all(color: theme.colorScheme.primary, width: 1.2)
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: isSelected
+                                      ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.08), blurRadius: 4)]
+                                      : [],
+                                ),
+                                child: CustomPaint(
+                                  painter: _AspectRatioPainter(
+                                    aspectRatio: option['aspect'],
+                                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              SizedBox(
+                                width: 48,
+                                child: Text(
+                                  option['label'],
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

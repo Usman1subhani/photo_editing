@@ -42,22 +42,40 @@ class _CollageScreenState extends State<CollageScreen> {
     {'label': '9:16', 'aspect': 9 / 16},
   ];
 
-  // Modal loader dialog
+  // Modern loader dialog with animation and Material 3 styling
   Future<void> _showSavingDialog([String message = "Saving..."]) async {
+    final theme = Theme.of(context);
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        backgroundColor: Colors.black87,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(color: Colors.white),
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.7, end: 1.0),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeInOut,
+                builder: (context, scale, child) => Transform.scale(
+                  scale: scale,
+                  child: CircularProgressIndicator(
+                    color: theme.colorScheme.primary,
+                    strokeWidth: 5,
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
-              Text(message, style: const TextStyle(color: Colors.white, fontSize: 18)),
+              Text(
+                message,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -292,65 +310,94 @@ class _CollageScreenState extends State<CollageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final ratio = ratioOptions[selectedRatioIndex]['aspect'];
     final layouts = _getAvailableLayouts();
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.colorScheme.background,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        leading: const BackButton(color: Colors.white),
+        backgroundColor: theme.colorScheme.surface,
+        elevation: 0,
+        leading: BackButton(color: theme.colorScheme.onSurface),
+        centerTitle: true,
+        title: Text(
+          'Collage',
+          style: theme.textTheme.titleLarge?.copyWith(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            letterSpacing: 0.5,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.photo_library, color: Colors.white),
+            icon: Icon(Icons.photo_library, color: theme.colorScheme.primary),
             onPressed: _pickImages,
+            tooltip: 'Pick Images',
           ),
           IconButton(
-            icon: const Icon(Icons.check, color: Colors.greenAccent),
+            icon: Icon(Icons.check, color: theme.colorScheme.secondary),
             onPressed: _saveCollage,
+            tooltip: 'Save Collage',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          const SizedBox(height: 8),
-          _buildRatioSelector(),
-          const SizedBox(height: 8),
-          if (selectedImages.isNotEmpty)
-            Expanded(
-              child: AspectRatio(
-                aspectRatio: ratio,
-                child: RepaintBoundary(
-                  key: _collageKey,
-                  child: Container(
-                    decoration: showBorder
-                        ? BoxDecoration(
-                            border: Border.all(color: Colors.blueAccent, width: 2.5),
-                            borderRadius: BorderRadius.circular(12),
-                          )
-                        : null,
-                    child: layouts.isNotEmpty
-                        ? layouts[selectedLayoutIndex]
-                        : const SizedBox.shrink(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            _buildRatioSelector(),
+            const SizedBox(height: 8),
+            if (selectedImages.isNotEmpty)
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  switchInCurve: Curves.easeInOut,
+                  switchOutCurve: Curves.easeInOut,
+                  child: AspectRatio(
+                    key: ValueKey(selectedLayoutIndex.toString() + selectedRatioIndex.toString()),
+                    aspectRatio: ratio,
+                    child: RepaintBoundary(
+                      key: _collageKey,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 350),
+                        curve: Curves.easeInOut,
+                        decoration: showBorder
+                            ? BoxDecoration(
+                                border: Border.all(color: theme.colorScheme.primary, width: 2.5),
+                                borderRadius: BorderRadius.circular(16),
+                              )
+                            : null,
+                        child: layouts.isNotEmpty
+                            ? layouts[selectedLayoutIndex]
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-          const SizedBox(height: 8),
-          if (selectedImages.isNotEmpty) _buildLayoutSelector(layouts.length),
-          const SizedBox(height: 8),
-          _buildMarginSlider(),
-          _buildBorderSlider(),
-          _buildBorderColorPicker(),
-        ],
+            const SizedBox(height: 8),
+            if (selectedImages.isNotEmpty) _buildLayoutSelector(layouts.length),
+            const SizedBox(height: 8),
+            _buildMarginSlider(),
+            _buildBorderSlider(),
+            _buildBorderColorPicker(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildRatioSelector() {
+    final theme = Theme.of(context);
     return Container(
       height: 50,
-      color: Colors.grey[900],
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: ratioOptions.length,
@@ -358,19 +405,23 @@ class _CollageScreenState extends State<CollageScreen> {
           final isSelected = selectedRatioIndex == index;
           return GestureDetector(
             onTap: () => setState(() => selectedRatioIndex = index),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              margin: const EdgeInsets.symmetric(horizontal: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.white24 : Colors.transparent,
+                color: isSelected ? theme.colorScheme.primary.withOpacity(0.15) : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
+                border: isSelected
+                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
+                    : null,
               ),
               child: Center(
                 child: Text(
                   ratioOptions[index]['label'],
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : Colors.grey,
-                    fontSize: 14,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ),
@@ -382,40 +433,52 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildLayoutSelector(int layoutCount) {
+    final theme = Theme.of(context);
     return Container(
       height: 90,
-      color: Colors.grey[900],
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: layoutCount,
         itemBuilder: (context, index) {
+          final isSelected = selectedLayoutIndex == index;
           return GestureDetector(
             onTap: () => setState(() => selectedLayoutIndex = index),
-            child: Container(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
               width: 80,
-              margin: const EdgeInsets.symmetric(horizontal: 6),
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: selectedLayoutIndex == index
-                    ? Colors.white24
-                    : Colors.transparent,
+                color: isSelected ? theme.colorScheme.primary.withOpacity(0.15) : Colors.transparent,
                 borderRadius: BorderRadius.circular(8),
+                border: isSelected
+                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
+                    : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.grid_on,
-                      color: selectedLayoutIndex == index
-                          ? Colors.white
-                          : Colors.grey),
+                  AnimatedScale(
+                    scale: isSelected ? 1.15 : 1.0,
+                    duration: const Duration(milliseconds: 250),
+                    child: Icon(Icons.grid_on,
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant),
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     'Layout ${index + 1}',
-                    style: TextStyle(
-                      color: selectedLayoutIndex == index
-                          ? Colors.white
-                          : Colors.grey,
-                      fontSize: 12,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ],
@@ -428,12 +491,13 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildMarginSlider() {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Margin", style: TextStyle(color: Colors.white)),
+          Text("Margin", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
           Slider(
             value: marginValue,
             min: 0,
@@ -441,6 +505,8 @@ class _CollageScreenState extends State<CollageScreen> {
             divisions: 20,
             label: marginValue.toStringAsFixed(1),
             onChanged: (value) => setState(() => marginValue = value),
+            activeColor: theme.colorScheme.primary,
+            inactiveColor: theme.colorScheme.primary.withOpacity(0.2),
           ),
         ],
       ),
@@ -448,12 +514,13 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildBorderSlider() {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Border Width", style: TextStyle(color: Colors.white)),
+          Text("Border Width", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
           Slider(
             value: borderWidth,
             min: 0,
@@ -461,6 +528,8 @@ class _CollageScreenState extends State<CollageScreen> {
             divisions: 20,
             label: borderWidth.toStringAsFixed(1),
             onChanged: (value) => setState(() => borderWidth = value),
+            activeColor: theme.colorScheme.primary,
+            inactiveColor: theme.colorScheme.primary.withOpacity(0.2),
           ),
         ],
       ),
@@ -468,8 +537,11 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildBorderColorPicker() {
+    final theme = Theme.of(context);
     final colors = [
       Colors.white,
+      theme.colorScheme.primary,
+      theme.colorScheme.secondary,
       Colors.red,
       Colors.blue,
       Colors.green,
@@ -477,27 +549,35 @@ class _CollageScreenState extends State<CollageScreen> {
       Colors.purple
     ];
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Border Color", style: TextStyle(color: Colors.white)),
+          Text("Border Color", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
           const SizedBox(height: 8),
           Row(
             children: colors.map((color) {
+              final isSelected = borderColor == color;
               return GestureDetector(
                 onTap: () => setState(() => borderColor = color),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.only(right: 8),
-                  width: 28,
-                  height: 28,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: color,
                     border: Border.all(
-                        color: Colors.white,
-                        width: borderColor == color ? 2 : 0),
+                        color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+                        width: isSelected ? 3 : 1),
                     shape: BoxShape.circle,
+                    boxShadow: isSelected
+                        ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 6)]
+                        : [],
                   ),
+                  child: isSelected
+                      ? Icon(Icons.check, color: Colors.white, size: 18)
+                      : null,
                 ),
               );
             }).toList(),

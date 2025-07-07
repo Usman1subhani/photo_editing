@@ -22,20 +22,30 @@ class ResizeScreen extends StatefulWidget {
 
 class _ResizeScreenState extends State<ResizeScreen> {
   Future<void> _showSavingDialog([String message = "Saving..."]) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        backgroundColor: Colors.black87,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         child: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(color: Colors.white),
+              CircularProgressIndicator(
+                color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(height: 24),
-              Text(message, style: const TextStyle(color: Colors.white, fontSize: 18)),
+              Text(
+                message,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),
@@ -208,20 +218,32 @@ class _ResizeScreenState extends State<ResizeScreen> {
     final double aspect = _getAspectRatio();
     final File imageToShow = widget.imageFile;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? const Color(0xFF181824) : Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        leading: BackButton(color: Colors.white),
+        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
+        leading: BackButton(color: isDark ? Colors.white : Colors.black),
+        elevation: 0,
+        title: Text(
+          'Resize Image',
+          style: TextStyle(
+            color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         actions: [
           if (isSaving)
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: CircularProgressIndicator(color: Colors.white),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: CircularProgressIndicator(
+                color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
+              ),
             )
           else
             IconButton(
-              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              icon: Icon(FontAwesomeIcons.check, color: isDark ? const Color(0xFFB69DF8) : Colors.greenAccent),
               onPressed: () async {
                 await _showSavingDialog();
                 setState(() => showBorder = false);
@@ -250,13 +272,18 @@ class _ResizeScreenState extends State<ResizeScreen> {
                   children: [
                     RepaintBoundary(
                       key: _previewKey,
-                      child: InteractiveViewer(
-                        transformationController: _transformationController,
-                        minScale: 1,
-                        maxScale: 4,
-                        child: Image.file(
-                          imageToShow,
-                          fit: BoxFit.contain,
+                      child: Card(
+                        color: isDark ? const Color(0xFF232336) : Colors.white,
+                        elevation: 4,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        child: InteractiveViewer(
+                          transformationController: _transformationController,
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Image.file(
+                            imageToShow,
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
@@ -264,8 +291,11 @@ class _ResizeScreenState extends State<ResizeScreen> {
                       IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.blueAccent, width: 2.5),
-                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark ? const Color(0xFFB69DF8) : Colors.blueAccent,
+                              width: 2.5,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
                           ),
                         ),
                       ),
@@ -277,7 +307,17 @@ class _ResizeScreenState extends State<ResizeScreen> {
           const SizedBox(height: 12),
           Container(
             height: 90,
-            color: Colors.grey[900],
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF232336) : Colors.grey[100],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.withOpacity(0.08),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: resizeOptions.length,
@@ -292,7 +332,13 @@ class _ResizeScreenState extends State<ResizeScreen> {
                   child: Container(
                     width: 70,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? (isDark ? const Color(0xFFB69DF8).withOpacity(0.18) : Colors.white24)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -300,15 +346,19 @@ class _ResizeScreenState extends State<ResizeScreen> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: isSelected ? Colors.white24 : Colors.transparent,
-                            borderRadius: BorderRadius.circular(8),
+                            color: isSelected
+                                ? (isDark ? const Color(0xFFB69DF8).withOpacity(0.22) : Colors.white38)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: resizeOptions[index]['aspect'] == null
-                              ? const Icon(Icons.crop, color: Colors.white)
+                              ? Icon(Icons.crop, color: isDark ? Colors.white : Colors.black)
                               : CustomPaint(
                                   painter: _AspectRatioPainter(
                                     aspectRatio: resizeOptions[index]['aspect'],
-                                    color: isSelected ? Colors.white : Colors.grey,
+                                    color: isSelected
+                                        ? (isDark ? const Color(0xFFB69DF8) : Colors.white)
+                                        : (isDark ? Colors.white54 : Colors.grey),
                                   ),
                                 ),
                         ),
@@ -316,8 +366,11 @@ class _ResizeScreenState extends State<ResizeScreen> {
                         Text(
                           resizeOptions[index]['label'],
                           style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.grey,
+                            color: isSelected
+                                ? (isDark ? const Color(0xFFB69DF8) : Colors.white)
+                                : (isDark ? Colors.white54 : Colors.grey),
                             fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                       ],
