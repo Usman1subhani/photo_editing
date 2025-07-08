@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 class CompressScreen extends StatefulWidget {
   final File? initialImageFile;
-  const CompressScreen({Key? key, this.initialImageFile}) : super(key: key);
+  const CompressScreen({super.key, this.initialImageFile});
 
   @override
   State<CompressScreen> createState() => _CompressScreenState();
@@ -19,30 +19,20 @@ class CompressScreen extends StatefulWidget {
 class _CompressScreenState extends State<CompressScreen> {
   // Modal loader dialog (consistent with other screens)
   Future<void> _showSavingDialog([String message = "Saving..."]) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: Colors.black87,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
           padding: const EdgeInsets.all(32.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(
-                color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
-              ),
+              const CircularProgressIndicator(color: Colors.white),
               const SizedBox(height: 24),
-              Text(
-                message,
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              Text(message, style: const TextStyle(color: Colors.white, fontSize: 18)),
             ],
           ),
         ),
@@ -182,27 +172,16 @@ class _CompressScreenState extends State<CompressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF181824) : Colors.white,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
-        elevation: 0,
-        leading: BackButton(color: isDark ? Colors.white : Colors.black),
-        centerTitle: true,
-        title: Text(
-          'Compress',
-          style: TextStyle(
-            color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            letterSpacing: 0.5,
-          ),
-        ),
+        backgroundColor: Colors.black,
+        leading: const BackButton(color: Colors.white),
         actions: [
           IconButton(
-            icon: Icon(FontAwesomeIcons.check, color: isDark ? const Color(0xFFB69DF8) : Colors.greenAccent),
-            onPressed: _compressedBytes == null ? null : _saveCompressedToGallery,
+            icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+            onPressed:
+                _compressedBytes == null ? null : _saveCompressedToGallery,
             tooltip: _compressedBytes == null ? 'Compress image first' : 'Save',
           ),
         ],
@@ -214,47 +193,40 @@ class _CompressScreenState extends State<CompressScreen> {
             Expanded(
               child: Center(
                 child: _compressedBytes != null || _imageFile != null
-                    ? Card(
-                        color: isDark ? const Color(0xFF232336) : Colors.white,
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                        child: Container(
-                          margin: const EdgeInsets.all(8),
-                          decoration: _showBorder
-                              ? BoxDecoration(
-                                  border: Border.all(
-                                    color: isDark ? const Color(0xFFB69DF8) : Colors.blueAccent,
-                                    width: 2.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                )
-                              : null,
-                          clipBehavior: Clip.hardEdge,
-                          child: InteractiveViewer(
-                            minScale: 1,
-                            maxScale: 4,
-                            child: Builder(
-                              builder: (_) {
-                                try {
-                                  if (_compressedBytes != null) {
-                                    return Image.memory(
-                                      _compressedBytes!,
-                                      key: const ValueKey('compressedImage'),
-                                      fit: BoxFit.contain,
-                                    );
-                                  } else {
-                                    return Image.file(_imageFile!, fit: BoxFit.contain);
-                                  }
-                                } catch (e) {
-                                  return const Center(
-                                    child: Text(
-                                      'Error displaying image',
-                                      style: TextStyle(color: Colors.redAccent),
-                                    ),
+                    ? Container(
+                        decoration: _showBorder
+                            ? BoxDecoration(
+                                border: Border.all(
+                                    color: Colors.blueAccent, width: 2.5),
+                                borderRadius: BorderRadius.circular(10),
+                              )
+                            : null,
+                        clipBehavior: Clip.hardEdge,
+                        child: InteractiveViewer(
+                          minScale: 1,
+                          maxScale: 4,
+                          child: Builder(
+                            builder: (_) {
+                              try {
+                                if (_compressedBytes != null) {
+                                  return Image.memory(
+                                    _compressedBytes!,
+                                    key: const ValueKey('compressedImage'),
+                                    fit: BoxFit.contain,
                                   );
+                                } else {
+                                  return Image.file(_imageFile!,
+                                      fit: BoxFit.contain);
                                 }
-                              },
-                            ),
+                              } catch (e) {
+                                return const Center(
+                                  child: Text(
+                                    'Error displaying image',
+                                    style: TextStyle(color: Colors.redAccent),
+                                  ),
+                                );
+                              }
+                            },
                           ),
                         ),
                       )
@@ -262,11 +234,9 @@ class _CompressScreenState extends State<CompressScreen> {
               ),
             )
           else
-            Expanded(
+            const Expanded(
               child: Center(
-                child: CircularProgressIndicator(
-                  color: isDark ? const Color(0xFFB69DF8) : Colors.blueAccent,
-                ),
+                child: CircularProgressIndicator(color: Colors.blueAccent),
               ),
             ),
           if (_originalSize != null || _compressedSize != null)
@@ -277,63 +247,47 @@ class _CompressScreenState extends State<CompressScreen> {
                   if (_originalSize != null)
                     Text(
                       'Original Size: ${(_originalSize! / 1024).toStringAsFixed(2)} KB',
-                      style: TextStyle(
-                        color: isDark ? Colors.white70 : Colors.black87,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
                     ),
                   if (_compressedSize != null)
                     Text(
                       'Compressed Size: ${(_compressedSize! / 1024).toStringAsFixed(2)} KB',
-                      style: TextStyle(
-                        color: isDark ? const Color(0xFFB69DF8) : Colors.greenAccent,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(
+                          color: Colors.greenAccent, fontSize: 14),
                     ),
                 ],
               ),
             ),
           Container(
             height: 90,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF232336) : Colors.grey[100],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
+            color: Colors.grey[900],
             child: Center(
               child: ElevatedButton.icon(
                 onPressed: _isCompressing || _imageFile == null
                     ? null
                     : _compressImage,
-                icon: Icon(FontAwesomeIcons.compress, color: isDark ? Colors.white : Colors.black),
+                icon:
+                    const Icon(FontAwesomeIcons.compress, color: Colors.white),
                 label: _isCompressing
-                    ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: CircularProgressIndicator(
-                          color: isDark ? const Color(0xFFB69DF8) : Colors.white,
-                        ),
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: CircularProgressIndicator(color: Colors.white),
                       )
                     : const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('Compress', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        child: Text('Compress',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
                       ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isDark ? const Color(0xFFB69DF8) : Colors.green.shade700,
+                  backgroundColor: Colors.green.shade700,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(180, 55),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                   elevation: 6,
-                  shadowColor: isDark ? const Color(0xFFB69DF8).withOpacity(0.2) : Colors.greenAccent,
+                  shadowColor: Colors.greenAccent,
                 ),
               ),
             ),

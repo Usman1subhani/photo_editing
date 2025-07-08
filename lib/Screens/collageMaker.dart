@@ -15,72 +15,71 @@ class CollageScreen extends StatefulWidget {
 }
 
 class _CollageScreenState extends State<CollageScreen> {
-  bool showBorder = true;
-  int selectedRatioIndex = 0;
   int selectedLayoutIndex = 0;
-  double marginValue = 4.0;
-  double borderWidth = 1.0;
-  Color borderColor = Colors.white;
+  Color backgroundColor = Colors.black;
+  double spacing = 4.0;
+  double cornerRadius = 0.0;
+  double frameRatio = 1.0; // Default 1:1
 
   final List<File> selectedImages = [];
   final picker = ImagePicker();
   final GlobalKey _collageKey = GlobalKey();
-
-  // Loader state
   bool _isSaving = false;
 
   // Track transformations for each image
-  final Map<int, Matrix4> _imageTransforms = {};
-  final Map<int, Offset> _imagePositions = {};
-  final Map<int, double> _imageScales = {};
+  final List<Offset> _imageTranslations = [];
+  final List<double> _imageScales = [];
+  final List<Offset> _lastFocalPoints = [];
 
-  final List<Map<String, dynamic>> ratioOptions = [
-    {'label': '1:1', 'aspect': 1.0},
-    {'label': '4:3', 'aspect': 4 / 3},
-    {'label': '3:4', 'aspect': 3 / 4},
-    {'label': '16:9', 'aspect': 16 / 9},
-    {'label': '9:16', 'aspect': 9 / 16},
+  // Layout options
+  final List<List<List<double>>> layoutOptions = [
+    // 2 photos - side by side
+    [
+      [0.0, 0.0, 0.5, 1.0],
+      [0.5, 0.0, 1.0, 1.0]
+    ],
+    // 2 photos - top and bottom
+    [
+      [0.0, 0.0, 1.0, 0.5],
+      [0.0, 0.5, 1.0, 1.0]
+    ],
+    // 3 photos - 1 large on left, 2 small on right
+    [
+      [0.0, 0.0, 0.6, 1.0],
+      [0.6, 0.0, 1.0, 0.5],
+      [0.6, 0.5, 1.0, 1.0]
+    ],
+    // 4 photos - grid
+    [
+      [0.0, 0.0, 0.5, 0.5],
+      [0.5, 0.0, 1.0, 0.5],
+      [0.0, 0.5, 0.5, 1.0],
+      [0.5, 0.5, 1.0, 1.0]
+    ],
   ];
 
-  // Modern loader dialog with animation and Material 3 styling
-  Future<void> _showSavingDialog([String message = "Saving..."]) async {
-    final theme = Theme.of(context);
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.7, end: 1.0),
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeInOut,
-                builder: (context, scale, child) => Transform.scale(
-                  scale: scale,
-                  child: CircularProgressIndicator(
-                    color: theme.colorScheme.primary,
-                    strokeWidth: 5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                message,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  // Frame ratio options
+  final List<Map<String, dynamic>> frameRatios = [
+    {'name': '1:1', 'value': 1.0},
+    {'name': '4:3', 'value': 4 / 3},
+    {'name': '16:9', 'value': 16 / 9},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _resetTransforms();
+  }
+
+  void _resetTransforms() {
+    _imageTranslations.clear();
+    _imageScales.clear();
+    _lastFocalPoints.clear();
+    for (int i = 0; i < selectedImages.length; i++) {
+      _imageTranslations.add(Offset.zero);
+      _imageScales.add(1.0);
+      _lastFocalPoints.add(Offset.zero);
+    }
   }
 
   Future<void> _pickImages() async {
@@ -89,396 +88,339 @@ class _CollageScreenState extends State<CollageScreen> {
       setState(() {
         selectedImages.clear();
         selectedImages.addAll(picked.map((e) => File(e.path)));
+        _resetTransforms();
         selectedLayoutIndex = 0;
-        // Reset transformations when new images are selected
-        _imageTransforms.clear();
-        _imagePositions.clear();
-        _imageScales.clear();
+        while (selectedLayoutIndex < layoutOptions.length &&
+            layoutOptions[selectedLayoutIndex].length < selectedImages.length) {
+          selectedLayoutIndex++;
+        }
+        if (selectedLayoutIndex >= layoutOptions.length) {
+          selectedLayoutIndex = 0;
+        }
       });
     }
   }
 
   Future<void> _saveCollage() async {
     try {
-      setState(() => showBorder = false);
-      await Future.delayed(const Duration(milliseconds: 50));
       setState(() => _isSaving = true);
-      _showSavingDialog();
-      // Request correct permissions for Android/iOS
+
       PermissionStatus status = await Permission.photos.request();
       if (!status.isGranted) {
         status = await Permission.storage.request();
       }
       if (!status.isGranted) {
-        setState(() {
-          showBorder = true;
-          _isSaving = false;
-        });
-        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gallery/storage permission not granted. Please enable it in app settings.')),
+          const SnackBar(content: Text('Permission not granted')),
         );
         return;
       }
-      RenderRepaintBoundary boundary = _collageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
+      RenderRepaintBoundary boundary = _collageKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       Uint8List pngBytes = byteData!.buffer.asUint8List();
 
-      // Save to gallery using image_gallery_saver
       final result = await ImageGallerySaver.saveImage(
         pngBytes,
         name: 'collage_${DateTime.now().millisecondsSinceEpoch}',
       );
-      setState(() {
-        showBorder = true;
-        _isSaving = false;
-      });
-      Navigator.of(context, rootNavigator: true).pop();
+
+      setState(() => _isSaving = false);
+
       if (result['isSuccess'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Collage saved to gallery!')),
+          const SnackBar(content: Text('Collage saved!')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save collage.')),
+          const SnackBar(content: Text('Failed to save collage')),
         );
       }
     } catch (e) {
-      setState(() {
-        showBorder = true;
-        _isSaving = false;
-      });
-      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving collage: $e')),
+        SnackBar(content: Text('Error: $e')),
       );
     }
   }
 
-  Widget _buildImageBox(int index) {
-    // Initialize transform if not exists
-    _imageTransforms.putIfAbsent(index, () => Matrix4.identity());
-    _imagePositions.putIfAbsent(index, () => Offset.zero);
-    _imageScales.putIfAbsent(index, () => 1.0);
+  Widget _buildPhotoFrame(int index) {
+    final layout = layoutOptions[selectedLayoutIndex];
+    if (index >= layout.length) return const SizedBox.shrink();
 
-    return GestureDetector(
-      onScaleStart: (details) {
-        // Store initial values when gesture starts
-        setState(() {
-          _imagePositions[index] = details.localFocalPoint;
-        });
-      },
-      onScaleUpdate: (details) {
-        setState(() {
-          // Calculate new scale
-          _imageScales[index] = (_imageScales[index] ?? 1.0) * details.scale;
-          _imageScales[index] = _imageScales[index]!.clamp(0.5, 4.0); // Limit scale range
+    final coords = layout[index];
+    final frameWidth =
+        (coords[2] - coords[0]) * MediaQuery.of(context).size.width;
+    final frameHeight =
+        (coords[3] - coords[1]) * MediaQuery.of(context).size.width;
 
-          // Calculate new position
-          final Offset delta = details.localFocalPoint - _imagePositions[index]!;
-          _imagePositions[index] = details.localFocalPoint;
-          
-          // Update transform matrix
-          _imageTransforms[index] = Matrix4.identity()
-            ..translate(delta.dx, delta.dy)
-            ..scale(_imageScales[index]!);
-        });
-      },
-      onDoubleTap: () {
-        // Reset on double tap
-        setState(() {
-          _imageTransforms[index] = Matrix4.identity();
-          _imageScales[index] = 1.0;
-          _imagePositions[index] = Offset.zero;
-        });
-      },
+    return Positioned(
+      left: coords[0] * MediaQuery.of(context).size.width,
+      top: coords[1] * MediaQuery.of(context).size.width,
+      width: frameWidth,
+      height: frameHeight,
       child: Container(
-        margin: EdgeInsets.all(marginValue),
+        margin: EdgeInsets.all(spacing),
         decoration: BoxDecoration(
-          color: Colors.grey[800],
-          border: Border.all(color: borderColor, width: borderWidth),
+          borderRadius: BorderRadius.circular(cornerRadius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
-        child: selectedImages.length > index
-            ? Transform(
-                transform: _imageTransforms[index]!,
-                alignment: FractionalOffset.center,
-                child: Image.file(
-                  selectedImages[index],
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-              )
-            : const SizedBox.shrink(),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(cornerRadius),
+          child: GestureDetector(
+            onScaleStart: (details) {
+              setState(() {
+                _lastFocalPoints[index] = details.localFocalPoint;
+              });
+            },
+            onScaleUpdate: (details) {
+              setState(() {
+                // Update scale
+                _imageScales[index] =
+                    (_imageScales[index] * details.scale).clamp(0.5, 4.0);
+
+                // Update translation
+                final delta = details.localFocalPoint - _lastFocalPoints[index];
+                _imageTranslations[index] += delta / _imageScales[index];
+                _lastFocalPoints[index] = details.localFocalPoint;
+
+                // Clamp translations to keep image within frame
+                final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
+                final maxDy = frameHeight * (_imageScales[index] - 1) / 2;
+                _imageTranslations[index] = Offset(
+                  _imageTranslations[index].dx.clamp(-maxDx, maxDx),
+                  _imageTranslations[index].dy.clamp(-maxDy, maxDy),
+                );
+              });
+            },
+            onDoubleTap: () {
+              setState(() {
+                _imageScales[index] = 1.0;
+                _imageTranslations[index] = Offset.zero;
+                _lastFocalPoints[index] = Offset.zero;
+              });
+            },
+            child: Transform(
+              transform: Matrix4.identity()
+                ..scale(_imageScales[index])
+                ..translate(
+                    _imageTranslations[index].dx, _imageTranslations[index].dy),
+              alignment: Alignment.center,
+              child: Container(
+                color: backgroundColor,
+                child: selectedImages.length > index
+                    ? Image.file(
+                        selectedImages[index],
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  List<Widget> _getAvailableLayouts() {
-    final count = selectedImages.length;
-    List<Widget> layouts = [];
-
-    if (count == 2) {
-      layouts = [
-        Row(children: [
-          Expanded(child: _buildImageBox(0)),
-          Expanded(child: _buildImageBox(1))
-        ]),
-        Column(children: [
-          Expanded(child: _buildImageBox(0)),
-          Expanded(child: _buildImageBox(1))
-        ]),
-        Row(
+  Widget _buildCollage() {
+    if (selectedImages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(child: _buildImageBox(0)),
-            Expanded(
-                child: Column(children: [Expanded(child: _buildImageBox(1))]))
-          ],
-        ),
-      ];
-    } else if (count == 3) {
-      layouts = [
-        Column(children: [
-          Expanded(child: _buildImageBox(0)),
-          Expanded(child: _buildImageBox(1)),
-          Expanded(child: _buildImageBox(2))
-        ]),
-        Row(children: [
-          Expanded(child: _buildImageBox(0)),
-          Expanded(child: _buildImageBox(1)),
-          Expanded(child: _buildImageBox(2))
-        ]),
-        Row(
-          children: [
-            Expanded(flex: 2, child: _buildImageBox(0)),
-            Expanded(
-              flex: 1,
-              child: Column(
-                children: [
-                  Expanded(child: _buildImageBox(1)),
-                  Expanded(child: _buildImageBox(2))
-                ],
-              ),
+            Icon(Icons.photo_library, size: 60, color: Colors.grey[600]),
+            const SizedBox(height: 16),
+            const Text(
+              'Select photos to create collage',
+              style: TextStyle(color: Colors.white, fontSize: 18),
             ),
           ],
         ),
-      ];
-    } else if (count == 4) {
-      layouts = [
-        GridView.count(
-          crossAxisCount: 2,
-          children: List.generate(4, (i) => _buildImageBox(i)),
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-        ),
-        Column(
-          children: [
-            Expanded(
-                child: Row(children: [
-              Expanded(child: _buildImageBox(0)),
-              Expanded(child: _buildImageBox(1))
-            ])),
-            Expanded(
-                child: Row(children: [
-              Expanded(child: _buildImageBox(2)),
-              Expanded(child: _buildImageBox(3))
-            ])),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: Column(children: [
-                Expanded(child: _buildImageBox(0)),
-                Expanded(child: _buildImageBox(2))
-              ]),
-            ),
-            Expanded(
-              child: Column(children: [
-                Expanded(child: _buildImageBox(1)),
-                Expanded(child: _buildImageBox(3))
-              ]),
-            ),
-          ],
-        ),
-      ];
+      );
     }
 
-    return layouts;
+    return AspectRatio(
+      aspectRatio: frameRatio,
+      child: Stack(
+        children: [
+          Container(color: backgroundColor),
+          ...List.generate(
+              selectedImages.length, (index) => _buildPhotoFrame(index)),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final ratio = ratioOptions[selectedRatioIndex]['aspect'];
-    final layouts = _getAvailableLayouts();
-
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: Colors.black,
         elevation: 0,
-        leading: BackButton(color: theme.colorScheme.onSurface),
-        centerTitle: true,
-        title: Text(
-          'Collage',
-          style: theme.textTheme.titleLarge?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            letterSpacing: 0.5,
-          ),
+        leading: BackButton(color: Colors.white),
+        title: const Text(
+          'Photo Collage',
+          style: TextStyle(color: Colors.white),
         ),
         actions: [
-          IconButton(
-            icon: Icon(Icons.photo_library, color: theme.colorScheme.primary),
-            onPressed: _pickImages,
-            tooltip: 'Pick Images',
+          if (_isSaving)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.photo_library, color: Colors.white),
+              onPressed: _pickImages,
+            ),
+            IconButton(
+              icon: const Icon(Icons.save, color: Colors.greenAccent),
+              onPressed: selectedImages.isNotEmpty ? _saveCollage : null,
+            ),
+          ],
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: RepaintBoundary(
+              key: _collageKey,
+              child: _buildCollage(),
+            ),
           ),
-          IconButton(
-            icon: Icon(Icons.check, color: theme.colorScheme.secondary),
-            onPressed: _saveCollage,
-            tooltip: 'Save Collage',
+          if (selectedImages.isNotEmpty) _buildControls(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      color: Colors.grey[900],
+      child: Column(
+        children: [
+          _buildFrameRatioSelector(),
+          const SizedBox(height: 12),
+          _buildLayoutSelector(),
+          const SizedBox(height: 12),
+          _buildSpacingSlider(),
+          const SizedBox(height: 12),
+          _buildCornerRadiusSlider(),
+          const SizedBox(height: 12),
+          _buildBackgroundColorPicker(),
+          const SizedBox(height: 8),
+          const Text(
+            'Pinch to zoom, drag to move, double tap to reset',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            _buildRatioSelector(),
-            const SizedBox(height: 8),
-            if (selectedImages.isNotEmpty)
-              Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  switchInCurve: Curves.easeInOut,
-                  switchOutCurve: Curves.easeInOut,
-                  child: AspectRatio(
-                    key: ValueKey(selectedLayoutIndex.toString() + selectedRatioIndex.toString()),
-                    aspectRatio: ratio,
-                    child: RepaintBoundary(
-                      key: _collageKey,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 350),
-                        curve: Curves.easeInOut,
-                        decoration: showBorder
-                            ? BoxDecoration(
-                                border: Border.all(color: theme.colorScheme.primary, width: 2.5),
-                                borderRadius: BorderRadius.circular(16),
-                              )
-                            : null,
-                        child: layouts.isNotEmpty
-                            ? layouts[selectedLayoutIndex]
-                            : const SizedBox.shrink(),
-                      ),
+    );
+  }
+
+  Widget _buildFrameRatioSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Frame Ratio',
+          style: TextStyle(color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: frameRatios.map((ratio) {
+            final isSelected = frameRatio == ratio['value'];
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    frameRatio = ratio['value'];
+                    _resetTransforms();
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? Colors.blueAccent : Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Text(
+                    ratio['name'],
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[400],
+                      fontSize: 14,
                     ),
                   ),
                 ),
               ),
-            const SizedBox(height: 8),
-            if (selectedImages.isNotEmpty) _buildLayoutSelector(layouts.length),
-            const SizedBox(height: 8),
-            _buildMarginSlider(),
-            _buildBorderSlider(),
-            _buildBorderColorPicker(),
-          ],
+            );
+          }).toList(),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildRatioSelector() {
-    final theme = Theme.of(context);
-    return Container(
-      height: 50,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
+  Widget _buildLayoutSelector() {
+    final imageCount = selectedImages.length;
+    return SizedBox(
+      height: 80,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: ratioOptions.length,
+        itemCount: layoutOptions.length,
         itemBuilder: (context, index) {
-          final isSelected = selectedRatioIndex == index;
-          return GestureDetector(
-            onTap: () => setState(() => selectedRatioIndex = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary.withOpacity(0.15) : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: isSelected
-                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  ratioOptions[index]['label'],
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+          if (layoutOptions[index].length < imageCount) {
+            return const SizedBox.shrink();
+          }
 
-  Widget _buildLayoutSelector(int layoutCount) {
-    final theme = Theme.of(context);
-    return Container(
-      height: 90,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: layoutCount,
-        itemBuilder: (context, index) {
           final isSelected = selectedLayoutIndex == index;
           return GestureDetector(
-            onTap: () => setState(() => selectedLayoutIndex = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
+            onTap: () {
+              setState(() {
+                selectedLayoutIndex = index;
+                _resetTransforms();
+              });
+            },
+            child: Container(
               width: 80,
-              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
-                color: isSelected ? theme.colorScheme.primary.withOpacity(0.15) : Colors.transparent,
+                color: isSelected ? Colors.blueAccent : Colors.grey[800],
                 borderRadius: BorderRadius.circular(8),
-                border: isSelected
-                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
-                    : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  AnimatedScale(
-                    scale: isSelected ? 1.15 : 1.0,
-                    duration: const Duration(milliseconds: 250),
-                    child: Icon(Icons.grid_on,
-                        color: isSelected
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.grid_on,
+                    color: isSelected ? Colors.white : Colors.grey[400],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Layout ${index + 1}',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[400],
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -490,76 +432,75 @@ class _CollageScreenState extends State<CollageScreen> {
     );
   }
 
-  Widget _buildMarginSlider() {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Margin", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
-          Slider(
-            value: marginValue,
-            min: 0,
-            max: 20,
-            divisions: 20,
-            label: marginValue.toStringAsFixed(1),
-            onChanged: (value) => setState(() => marginValue = value),
-            activeColor: theme.colorScheme.primary,
-            inactiveColor: theme.colorScheme.primary.withOpacity(0.2),
-          ),
-        ],
-      ),
+  Widget _buildSpacingSlider() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Spacing',
+          style: TextStyle(color: Colors.white),
+        ),
+        Slider(
+          value: spacing,
+          min: 0,
+          max: 20,
+          divisions: 20,
+          label: spacing.toStringAsFixed(1),
+          onChanged: (value) => setState(() => spacing = value),
+          activeColor: Colors.blueAccent,
+          inactiveColor: Colors.blueAccent.withOpacity(0.2),
+        ),
+      ],
     );
   }
 
-  Widget _buildBorderSlider() {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Border Width", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
-          Slider(
-            value: borderWidth,
-            min: 0,
-            max: 10,
-            divisions: 20,
-            label: borderWidth.toStringAsFixed(1),
-            onChanged: (value) => setState(() => borderWidth = value),
-            activeColor: theme.colorScheme.primary,
-            inactiveColor: theme.colorScheme.primary.withOpacity(0.2),
-          ),
-        ],
-      ),
+  Widget _buildCornerRadiusSlider() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Corner Radius',
+          style: TextStyle(color: Colors.white),
+        ),
+        Slider(
+          value: cornerRadius,
+          min: 0,
+          max: 50,
+          divisions: 10,
+          label: cornerRadius.toStringAsFixed(0),
+          onChanged: (value) => setState(() => cornerRadius = value),
+          activeColor: Colors.blueAccent,
+          inactiveColor: Colors.blueAccent.withOpacity(0.2),
+        ),
+      ],
     );
   }
 
-  Widget _buildBorderColorPicker() {
-    final theme = Theme.of(context);
+  Widget _buildBackgroundColorPicker() {
     final colors = [
+      Colors.black,
       Colors.white,
-      theme.colorScheme.primary,
-      theme.colorScheme.secondary,
-      Colors.red,
-      Colors.blue,
-      Colors.green,
-      Colors.yellow,
-      Colors.purple
+      Colors.grey[800]!,
+      Colors.blueGrey[900]!,
+      Colors.red[900]!,
+      Colors.green[900]!,
+      Colors.blue[900]!,
     ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Border Color", style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurface)),
-          const SizedBox(height: 8),
-          Row(
-            children: colors.map((color) {
-              final isSelected = borderColor == color;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Background Color',
+          style: TextStyle(color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            ...colors.map((color) {
+              final isSelected = backgroundColor == color;
               return GestureDetector(
-                onTap: () => setState(() => borderColor = color),
+                onTap: () => setState(() => backgroundColor = color),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.only(right: 8),
@@ -568,22 +509,17 @@ class _CollageScreenState extends State<CollageScreen> {
                   decoration: BoxDecoration(
                     color: color,
                     border: Border.all(
-                        color: isSelected ? theme.colorScheme.primary : Colors.transparent,
-                        width: isSelected ? 3 : 1),
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
                     shape: BoxShape.circle,
-                    boxShadow: isSelected
-                        ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.2), blurRadius: 6)]
-                        : [],
                   ),
-                  child: isSelected
-                      ? Icon(Icons.check, color: Colors.white, size: 18)
-                      : null,
                 ),
               );
-            }).toList(),
-          ),
-        ],
-      ),
+            }),
+          ],
+        ),
+      ],
     );
   }
 }

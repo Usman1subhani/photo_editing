@@ -1,13 +1,12 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
-import 'package:flutter/cupertino.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart'; 
+import 'package:flutter/rendering.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class ResizeWithPlatform extends StatefulWidget {
   final File imageFile;
@@ -22,73 +21,53 @@ class ResizeWithPlatform extends StatefulWidget {
 
 class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
   bool showBorder = true;
-  // Modern loader dialog with Material 3 styling and theme adaptation
-  Future<void> _showSavingDialog([String message = "Saving..."]) async {
-    final theme = Theme.of(context);
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.7, end: 1.0),
-                duration: const Duration(milliseconds: 700),
-                curve: Curves.easeInOut,
-                builder: (context, scale, child) => Transform.scale(
-                  scale: scale,
-                  child: CircularProgressIndicator(
-                    color: theme.colorScheme.primary,
-                    strokeWidth: 5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                message,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
   final TransformationController _transformationController =
       TransformationController();
   final GlobalKey _previewKey = GlobalKey();
   int selectedOption = 0;
   bool isSaving = false;
+  Color _backgroundColor = Colors.black;
 
-  Future<File> captureRenderedImageAndResize(int width, int height) async {
+  final List<Color> _predefinedColors = [
+    Colors.black,
+    Colors.white,
+    Colors.red,
+    Colors.green,
+    Colors.blue,
+    Colors.yellow,
+    Colors.purple,
+    Colors.orange,
+  ];
+
+  Future<File> captureRenderedImage() async {
     try {
-      RenderRepaintBoundary boundary = _previewKey.currentContext!
-          .findRenderObject() as RenderRepaintBoundary;
-      var image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ImageByteFormat.png);
-      Uint8List pngBytes = byteData!.buffer.asUint8List();
+      RenderRepaintBoundary boundary =
+          _previewKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
 
-      img.Image? decoded = img.decodeImage(pngBytes);
-      if (decoded == null) throw Exception('Failed to decode screenshot');
-      img.Image resized = img.copyResize(decoded, width: width, height: height);
-      Uint8List resizedBytes = Uint8List.fromList(img.encodePng(resized));
+      final options = platformOptions[widget.platform] ?? [];
+      final option = options[selectedOption];
+      final double targetWidth = (option['width'] ?? 2048).toDouble();
+
+      final RenderBox renderBox =
+          _previewKey.currentContext!.findRenderObject() as RenderBox;
+      final Size widgetSize = renderBox.size;
+
+      final double pixelRatio = (targetWidth / widgetSize.width).clamp(1.0, 5.0);
+
+      ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
+
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+      Uint8List pngBytes = byteData!.buffer.asUint8List();
 
       final Directory tempDir = Directory.systemTemp;
       final String tempPath =
-          '${tempDir.path}/final_rendered_image_${DateTime.now().millisecondsSinceEpoch}.png';
-      File resizedFile = File(tempPath)..writeAsBytesSync(resizedBytes);
+          '${tempDir.path}/frame_crop_${DateTime.now().millisecondsSinceEpoch}.png';
+      File resizedFile = File(tempPath)..writeAsBytesSync(pngBytes);
       return resizedFile;
     } catch (e) {
       print("Render error: $e");
-      return widget.imageFile;
+      throw Exception('Failed to capture image: $e');
     }
   }
 
@@ -125,8 +104,7 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
         'width': 960,
         'height': 540,
         'aspect': 16 / 9
-      },
-      {'label': 'Video', 'width': 1080, 'height': 1920, 'aspect': 9 / 16},
+      }, 
     ],
     'YouTube': [
       {'label': 'Profile', 'width': 800, 'height': 800, 'aspect': 1.0},
@@ -195,55 +173,35 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
   };
 
   Future<void> _saveImageToGallery(File imageFile) async {
+    setState(() => isSaving = true);
     try {
-      setState(() => isSaving = true);
-
-      PermissionStatus status;
-      if (await Permission.photos.request().isGranted) {
-        status = PermissionStatus.granted;
-      } else {
-        status = await Permission.storage.request();
-      }
-
-      if (!status.isGranted) {
-        if (status.isPermanentlyDenied) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                  'Storage permission permanently denied. Please enable it in app settings.'),
-              action: SnackBarAction(
-                  label: 'Settings', onPressed: () => openAppSettings()),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Storage permission not granted')),
-          );
-        }
-        throw Exception('Storage permission not granted');
-      }
+      PermissionStatus status = await Permission.photos.request();
+      if (!status.isGranted) status = await Permission.storage.request();
+      if (!status.isGranted) throw Exception('Permission denied');
 
       final bytes = await imageFile.readAsBytes();
       final result = await ImageGallerySaver.saveImage(
         bytes,
-        quality: 100,
-        name: "resized_image_${DateTime.now().millisecondsSinceEpoch}",
+        quality: 100, // Max quality
+        name: "frame_cropped_${DateTime.now().millisecondsSinceEpoch}",
       );
 
       if (result['isSuccess'] == true) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image saved to gallery!')),
+          const SnackBar(content: Text('Image saved successfully!')),
         );
       } else {
-        throw Exception('Failed to save image');
+        throw Exception('Failed to save image to gallery.');
       }
     } catch (e) {
       print("Save error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save image: $e')),
-      );
+      // Re-throw to be handled by the caller's catch block
+      throw Exception('Failed to save image: $e');
     } finally {
-      setState(() => isSaving = false);
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
     }
   }
 
@@ -256,7 +214,7 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
         : 1.0;
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.background,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -276,17 +234,37 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
             IconButton(
               icon: Icon(FontAwesomeIcons.check, color: theme.colorScheme.secondary, size: 22),
               tooltip: 'Save',
-              onPressed: () async {
-                await _showSavingDialog();
-                setState(() => showBorder = false);
-                await Future.delayed(const Duration(milliseconds: 50));
-                if (selectedOption < options.length) {
-                  final option = options[selectedOption];
-                  File imageToSave = await captureRenderedImageAndResize(option['width'], option['height']);
-                  await _saveImageToGallery(imageToSave);
-                  setState(() => showBorder = true);
-                  if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
-                  if (mounted) Navigator.pop(context, imageToSave);
+              onPressed: isSaving ? null : () async {
+                setState(() {
+                  isSaving = true;
+                  showBorder = false;
+                });
+                
+                try {
+                  await Future.delayed(const Duration(milliseconds: 50));
+                  
+                  File finalFile = await captureRenderedImage();
+                  
+                  await _saveImageToGallery(finalFile);
+                  
+                  if (mounted) Navigator.pop(context, finalFile);
+
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString().replaceAll("Exception: ", "")}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      isSaving = false;
+                      showBorder = true;
+                    });
+                  }
                 }
               },
             ),
@@ -307,12 +285,16 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                         children: [
                           RepaintBoundary(
                             key: _previewKey,
-                            child: InteractiveViewer(
-                              transformationController: _transformationController,
-                              minScale: 1,
-                              maxScale: 4,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
+                            child: Card(
+                              color: _backgroundColor,
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18)),
+                              clipBehavior: Clip.antiAlias,
+                              child: InteractiveViewer(
+                                transformationController: _transformationController,
+                                minScale: 1,
+                                maxScale: 4,
                                 child: Image.file(
                                   widget.imageFile,
                                   fit: BoxFit.contain,
@@ -337,83 +319,146 @@ class _ResizeWithPlatformState extends State<ResizeWithPlatform> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 80),
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceVariant,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    boxShadow: [
-                      BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2)),
-                    ],
-                  ),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) {
-                      final option = options[index];
-                      final isSelected = selectedOption == index;
-                      return GestureDetector(
-                        onTap: () => setState(() => selectedOption = index),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? theme.colorScheme.primary.withOpacity(0.15)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                            border: isSelected
-                                ? Border.all(color: theme.colorScheme.primary, width: 1.2)
-                                : null,
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: isSelected
-                                      ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.08), blurRadius: 4)]
-                                      : [],
-                                ),
-                                child: CustomPaint(
-                                  painter: _AspectRatioPainter(
-                                    aspectRatio: option['aspect'],
-                                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              SizedBox(
-                                width: 48,
-                                child: Text(
-                                  option['label'],
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
-                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                _buildResizeOptions(theme, options),
+                _buildColorOptions(theme.brightness == Brightness.dark),
               ],
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pick a color'),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: _backgroundColor,
+            onColorChanged: (color) => setState(() => _backgroundColor = color),
+            pickerAreaHeightPercent: 0.8,
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Done'),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColorOptions(bool isDark) {
+    return Container(
+      height: 60,
+      color: isDark ? const Color(0xFF232336) : Colors.grey[100],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ..._predefinedColors.map((color) => GestureDetector(
+                onTap: () => setState(() => _backgroundColor = color),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _backgroundColor == color
+                          ? (isDark ? Colors.white : Colors.black)
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              )),
+          IconButton(
+            icon:
+                Icon(Icons.color_lens, color: isDark ? Colors.white : Colors.black),
+            onPressed: _showColorPicker,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResizeOptions(ThemeData theme, List<Map<String, dynamic>> options) {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 80),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(color: theme.shadowColor.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, -2)),
+        ],
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final isSelected = selectedOption == index;
+          return GestureDetector(
+            onTap: () => setState(() => selectedOption = index),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? theme.colorScheme.primary.withOpacity(0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: isSelected
+                    ? Border.all(color: theme.colorScheme.primary, width: 1.2)
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: isSelected
+                          ? [BoxShadow(color: theme.colorScheme.primary.withOpacity(0.08), blurRadius: 4)]
+                          : [],
+                    ),
+                    child: CustomPaint(
+                      painter: _AspectRatioPainter(
+                        aspectRatio: option['aspect'],
+                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    width: 48,
+                    child: Text(
+                      option['label'],
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: isSelected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

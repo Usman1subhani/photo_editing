@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 
 class ImageConstants {
   static const String splash1 = "assets/splash-image-scroll (1).jpg";

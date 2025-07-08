@@ -51,7 +51,7 @@ class _SplashScreenState extends State<SplashScreen> {
               SizedBox(height: 25.h),
               GestureDetector(
                 onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeScreen()));
                 },
                 child: Container(
                   height: 60.h,

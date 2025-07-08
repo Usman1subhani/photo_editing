@@ -1,13 +1,13 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
+import 'dart:io'; 
+import 'package:flutter/material.dart'; 
 import 'package:image_picker/image_picker.dart';
 import 'package:cropmeapp/Screens/Compress.dart';
 import 'package:cropmeapp/Screens/editImage.dart';
-import 'package:cropmeapp/Screens/collageMaker.dart' hide Padding;
+import 'package:cropmeapp/Screens/collageMaker.dart';
 import 'package:cropmeapp/Screens/resizeScreen.dart';
-import 'package:cropmeapp/Constants/color_constants.dart';
+import 'package:cropmeapp/Constants/color_constants.dart'; 
 import 'package:cropmeapp/Screens/resizeWithPlatform.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart'; 
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,10 +25,11 @@ class _HomeScreenState extends State<HomeScreen> {
     'TikTok',
     'YouTube',
     'Twitter',
+    
   ];
   final List<String> newPlatforms = [
     'LinkedIn',
-    'WhatsApp',
+    'WhatsApp', 
     'Snapchat',
     'Pinterest', // Only in newPlatforms, not in platforms
   ];
@@ -42,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'Snapchat': FontAwesomeIcons.snapchat,
     'Twitter': FontAwesomeIcons.twitter,
     'LinkedIn': FontAwesomeIcons.linkedin,
-    'Pinterest': FontAwesomeIcons.pinterest,
+    'Pinterest': FontAwesomeIcons.pinterest, 
   };
 
   final Map<String, Color> platformBrandColors = {
@@ -52,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     'YouTube': const Color(0xFFFF0000),
     'Twitter': const Color(0xFF1DA1F2),
     'LinkedIn': const Color(0xFF0A66C2),
-    'WhatsApp': const Color(0xFF25D366),
+    'WhatsApp': const Color(0xFF25D366), 
     'Snapchat': const Color(0xFFFFFC00),
     'Pinterest': const Color(0xFFE60023),
   };
@@ -116,287 +117,292 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cardActions = [
-      {
-        'label': 'Resize',
-        'icon': FontAwesomeIcons.expandArrowsAlt,
-        'color': const Color(0xFF6750A4),
-        'onTap': () => selectGalleryImage(context),
-        'desc': 'Resize images for any platform',
-      },
-      {
-        'label': 'Edit',
-        'icon': FontAwesomeIcons.edit,
-        'color': const Color(0xFF03DAC6),
-        'onTap': () => selectGalleryImageforEdit(context),
-        'desc': 'Crop, draw, and enhance',
-      },
-      {
-        'label': 'Collage',
-        'icon': FontAwesomeIcons.images,
-        'color': const Color(0xFFE4405F),
-        'onTap': () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const CollageScreen())),
-        'desc': 'Combine multiple images',
-      },
-      {
-        'label': 'Compress',
-        'icon': FontAwesomeIcons.compress,
-        'color': const Color(0xFF1DA1F2),
-        'onTap': () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const CompressScreen())),
-        'desc': 'Reduce file size, keep quality',
-      },
-    ];
-
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: ColorConstants.backgroundColor,
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: Icon(FontAwesomeIcons.crown,
-              size: 28, color: Colors.amber.shade400),
-        ),
-        title: const Text("CropMe"),
+        leading: GestureDetector(
+            onTap: () {},
+            child: const Icon(FontAwesomeIcons.crown,
+                size: 25, color: Colors.yellowAccent)),
+        title: const Text("CropMe",
+            style: TextStyle(
+                color: ColorConstants.primaryColor,
+                fontWeight: FontWeight.w700)),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        elevation: 0,
+        backgroundColor: ColorConstants.bottomBar,
       ),
       body: SingleChildScrollView(
-        child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Welcome!",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: () {
+                selectGalleryImage(context);
+              },
+              child: Container(
+                height: 150,
+                width: 400,
+                margin: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: ColorConstants.bottomBar,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(Icons.add_a_photo,
+                          size: 40, color: ColorConstants.primaryColor),
+                      Text('Resize Image',
+                          style: TextStyle(
+                              color: ColorConstants.primaryColor,
+                              fontWeight: FontWeight.w700)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  "Resize, edit, collage, and compress your images for any social platform.",
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onBackground
-                        .withOpacity(0.7),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // --- Social Media Grid (2 rows) ---
-                Text(
-                  "Resize for Social Media",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                // Custom 2-row grid for social icons: 5 in first row, 4 centered in second row
-                // Responsive 2-row grid for social icons: 5 in first row, 4 centered in second row, no overflow
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const double iconCardWidth = 55;
-                    const double iconCardSpacing = 5;
-                    final double totalWidth = constraints.maxWidth;
-                    // Calculate left padding to center 5 icons in first row
-                    const double row1ContentWidth =
-                        5 * iconCardWidth + 4 * iconCardSpacing;
-                    final double row1LeftPad =
-                        (totalWidth - row1ContentWidth) / 2;
-                    // Calculate left padding to center 4 icons in second row
-                    const double row2ContentWidth =
-                        4 * iconCardWidth + 3 * iconCardSpacing;
-                    final double row2LeftPad =
-                        (totalWidth - row2ContentWidth) / 2;
-                    return // 2-row grid for social icons: 5 in first row (centered, 2px padding), 4 centered in second row
-                        Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ...platforms.map((platform) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 2.0, vertical: 2),
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        selectGalleryImageForSocialMedia(
-                                            context, platform),
-                                    child: Card( 
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Container(
-                                        width: 54,
-                                        height: 70,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 10),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            FaIcon(
-                                              platformIcons[platform],
-                                              color:
-                                                  platformBrandColors[platform],
-                                              size: 24,
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              platform,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: platformBrandColors[
-                                                    platform],
-                                                fontSize: 11,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ))
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            ...newPlatforms.map((platform) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 3.0, vertical: 2),
-                                  child: GestureDetector(
-                                    onTap: () =>
-                                        selectGalleryImageForSocialMedia(
-                                            context, platform),
-                                    child: Card(
-                                      elevation: 2,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Container(
-                                        width: 54,
-                                        height: 70,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 10),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            FaIcon(
-                                              platformIcons[platform],
-                                              color:
-                                                  platformBrandColors[platform],
-                                              size: 24,
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              platform,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: platformBrandColors[
-                                                    platform],
-                                                fontSize: 11,
-                                              ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ))
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-                // --- Main Action Cards ---
-                Wrap(
-                  spacing: 18,
-                  runSpacing: 18,
-                  children: cardActions.map((action) {
-                    return SizedBox(
-                      width: (MediaQuery.of(context).size.width - 18 * 3) / 2,
-                      child: GestureDetector(
-                        onTap: action['onTap'] as void Function(),
-                        child: Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(22),
-                              gradient: LinearGradient(
-                                colors: [
-                                  (action['color'] as Color).withOpacity(0.13),
-                                  Colors.white,
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(18),
+              ),
+            ),
+            // Container(
+            //   height: 120,
+            //   width: double.infinity,
+            //   margin: const EdgeInsets.only(left: 15, right: 15),
+            //   child: ListView.builder(
+            //       scrollDirection: Axis.horizontal,
+            //       itemCount: platforms.length,
+            //       itemBuilder: (context, index) {
+            //         String platform = platforms[index];
+            //         IconData icon = platformIcons[platform]!;
+            //         return GestureDetector(
+            //           onTap: () {
+            //             selectGalleryImage(context, platform);
+            //           },
+            //           child: Container(
+            //             height: 100,
+            //             width: 100,
+            //             margin: const EdgeInsets.all(5),
+            //             decoration: BoxDecoration(
+            //               color: ColorConstants.bottomBar,
+            //               borderRadius: BorderRadius.circular(20),
+            //             ),
+            //             child: Center(child: FaIcon(icon, size: 40, color: ColorConstants.primaryColor)),
+            //           ),
+            //         );
+            //       }
+            //   ),
+            // ),
+            Padding(
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Resize Image for',
+                      style: TextStyle(
+                          color: ColorConstants.primaryColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 22)),
+                  const SizedBox(height: 18),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 16,
+                    children: [
+                      ...<dynamic>{...platforms, ...newPlatforms}.map((platform) {
+                        IconData icon = platformIcons[platform]!;
+                        Color iconColor = platformBrandColors[platform] ?? Colors.black;
+                        return SizedBox(
+                          width: 60,
+                          child: GestureDetector(
+                            onTap: () {
+                              selectGalleryImageForSocialMedia(context, platform);
+                            },
                             child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                CircleAvatar(
-                                  radius: 30,
-                                  backgroundColor: (action['color'] as Color)
-                                      .withOpacity(0.13),
-                                  child: Icon(
-                                    action['icon'] as IconData,
-                                    color: action['color'] as Color,
-                                    size: 32,
+                                Container(
+                                  height: 50,
+                                  width: 50,
+                                  decoration: BoxDecoration(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  action['label'] as String,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 18,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  action['desc'] as String,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onBackground
-                                        .withOpacity(0.7),
+                                  child: Center(
+                                    child: FaIcon(icon, size: 40, color: iconColor),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        );
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 20, right: 20, top: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Text('', style: TextStyle(color: ColorConstants.primaryColor, fontWeight: FontWeight.w500, fontSize: 20)),
+                  Container(
+                    height: 140,
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 10, bottom: 10),
+                    decoration: BoxDecoration(
+                      color: ColorConstants.bottomBar,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  selectGalleryImageforEdit(context);
+                                },
+                                child: Container(
+                                  height: 80,
+                                  width: 80,
+                                  margin: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: ColorConstants.backgroundColor,
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Center(
+                                      child: FaIcon(FontAwesomeIcons.image,
+                                          size: 30,
+                                          color: ColorConstants.primaryColor)),
+                                ),
+                              ),
+                              const Text('Edit',
+                                  style: TextStyle(
+                                      color: ColorConstants.primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 15)),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const CollageScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 80,
+                                  width: 80,
+                                  margin: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: ColorConstants.backgroundColor,
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Center(
+                                    child: Image(
+                                        image: AssetImage("assets/collage.png"),
+                                        width: 30,
+                                        height: 30),
+                                  ),
+                                ),
+                              ),
+                              const Text('Collage',
+                                  style: TextStyle(
+                                      color: ColorConstants.primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 15)),
+                            ],
+                          ),
+                          Column(
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const CompressScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  height: 80,
+                                  width: 80,
+                                  margin: const EdgeInsets.all(5),
+                                  decoration: BoxDecoration(
+                                    color: ColorConstants.backgroundColor,
+                                    borderRadius: BorderRadius.circular(100),
+                                  ),
+                                  child: const Center(
+                                    child: Image(
+                                        image: AssetImage(
+                                            "assets/image_compress.png"),
+                                        width: 30,
+                                        height: 30),
+                                  ),
+                                ),
+                              ),
+                              const Text('Compress',
+                                  style: TextStyle(
+                                      color: ColorConstants.primaryColor,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 15)),
+                            ],
+                          ),
+                        ],
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-                // --- Reserved space for ads ---
-                SizedBox(height: 60),
-              ],
-            )),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Padding(
+            //   padding: const EdgeInsets.only(left: 20, right: 20, top: 5),
+            //   child: Column(
+            //     crossAxisAlignment: CrossAxisAlignment.start,
+            //     children: [
+            //       Row(
+            //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            //         children: [
+            //           const Text('Trending', style: TextStyle(color: ColorConstants.primaryColor, fontWeight: FontWeight.w500, fontSize: 20)),
+            //           IconButton(
+            //               onPressed: () {},
+            //               icon: const Icon(
+            //                 Icons.navigate_next,
+            //                 color: ColorConstants.primaryColor,
+            //                 size: 30,
+            //               ),
+            //           ),
+            //         ],
+            //       ),
+            //       Container(
+            //         height: 140,
+            //         width: double.infinity,
+            //         margin: const EdgeInsets.only(top: 10, bottom: 10),
+            //         decoration: BoxDecoration(
+            //           color: ColorConstants.bottomBar,
+            //           borderRadius: BorderRadius.circular(20),
+            //         ),
+            //         child: const Padding(
+            //           padding: const EdgeInsets.only(top: 10),
+            //           child: Row(
+            //             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            //             children: [
+            //
+            //             ],
+            //           ),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
+          ],
+        ),
       ),
     );
   }

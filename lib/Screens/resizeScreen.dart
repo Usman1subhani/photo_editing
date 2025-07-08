@@ -1,16 +1,12 @@
-// ✅ This is your updated and fixed ResizeScreen.dart file
-
-// [NO CHANGES NEEDED HERE]
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; 
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:flutter_resizer_image/flutter_resizer_image.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image/image.dart' as img;
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class ResizeScreen extends StatefulWidget {
   final File imageFile;
@@ -21,45 +17,25 @@ class ResizeScreen extends StatefulWidget {
 }
 
 class _ResizeScreenState extends State<ResizeScreen> {
-  Future<void> _showSavingDialog([String message = "Saving..."]) async {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                message,
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
   final GlobalKey _previewKey = GlobalKey();
   final TransformationController _transformationController =
       TransformationController();
-  final resizerImage = FlutterResizerImage.instance();
 
   bool isSaving = false;
   int selectedOption = 1;
   File? resizedImage;
+  Color _backgroundColor = Colors.black;
+
+  final List<Color> _predefinedColors = [
+    Colors.black,
+    Colors.white,
+    Colors.red,
+    Colors.green,
+    Colors.blue,
+    Colors.yellow,
+    Colors.purple,
+    Colors.orange,
+  ];
 
   final List<Map<String, dynamic>> resizeOptions = [
     // Basic ratios
@@ -155,25 +131,34 @@ class _ResizeScreenState extends State<ResizeScreen> {
 
   bool showBorder = true;
 
-  Future<File> captureRenderedImageAndResize(int width, int height) async {
+  Future<File> captureRenderedImage() async {
     try {
-      RenderRepaintBoundary boundary = _previewKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      var image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ImageByteFormat.png);
+      RenderRepaintBoundary boundary =
+          _previewKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
+      final option = resizeOptions[selectedOption];
+      final double targetWidth = (option['width'] ?? 2048).toDouble();
+
+      final RenderBox renderBox =
+          _previewKey.currentContext!.findRenderObject() as RenderBox;
+      final Size widgetSize = renderBox.size;
+
+      final double pixelRatio = (targetWidth / widgetSize.width).clamp(1.0, 5.0);
+
+      ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
+
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       Uint8List pngBytes = byteData!.buffer.asUint8List();
 
-      img.Image? decoded = img.decodeImage(pngBytes);
-      if (decoded == null) throw Exception('Failed to decode screenshot');
-      img.Image resized = img.copyResize(decoded, width: width, height: height);
-      Uint8List resizedBytes = Uint8List.fromList(img.encodePng(resized));
-
       final Directory tempDir = Directory.systemTemp;
-      final String tempPath = '${tempDir.path}/frame_crop_${DateTime.now().millisecondsSinceEpoch}.png';
-      File resizedFile = File(tempPath)..writeAsBytesSync(resizedBytes);
+      final String tempPath =
+          '${tempDir.path}/frame_crop_${DateTime.now().millisecondsSinceEpoch}.png';
+      File resizedFile = File(tempPath)..writeAsBytesSync(pngBytes);
       return resizedFile;
     } catch (e) {
       print("Render error: $e");
-      return widget.imageFile;
+      throw Exception('Failed to capture image: $e');
     }
   }
 
@@ -192,15 +177,20 @@ class _ResizeScreenState extends State<ResizeScreen> {
       );
 
       if (result['isSuccess'] == true) {
-        // ignore: use_build_context_synchronously
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image saved!')),
+          const SnackBar(content: Text('Image saved successfully!')),
         );
+      } else {
+        throw Exception('Failed to save image to gallery.');
       }
     } catch (e) {
       print("Save error: $e");
+      throw Exception('Failed to save image: $e');
     } finally {
-      setState(() => isSaving = false);
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
     }
   }
 
@@ -218,44 +208,66 @@ class _ResizeScreenState extends State<ResizeScreen> {
     final double aspect = _getAspectRatio();
     final File imageToShow = widget.imageFile;
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF181824) : Colors.white,
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF232336) : Colors.white,
-        leading: BackButton(color: isDark ? Colors.white : Colors.black),
+        backgroundColor: Colors.black,
+        leading: const BackButton(color: Colors.white),
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Resize Image',
           style: TextStyle(
-            color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         actions: [
           if (isSaving)
-            Padding(
-              padding: const EdgeInsets.all(12),
+            const Padding(
+              padding: EdgeInsets.all(12),
               child: CircularProgressIndicator(
-                color: isDark ? const Color(0xFFB69DF8) : Theme.of(context).colorScheme.primary,
+                color: Colors.white,
               ),
             )
           else
             IconButton(
-              icon: Icon(FontAwesomeIcons.check, color: isDark ? const Color(0xFFB69DF8) : Colors.greenAccent),
-              onPressed: () async {
-                await _showSavingDialog();
-                setState(() => showBorder = false);
-                await Future.delayed(const Duration(milliseconds: 50));
-                File finalFile = imageToShow;
-                if (option['width'] != null && option['height'] != null) {
-                  finalFile = await captureRenderedImageAndResize(option['width'], option['height']);
+              icon: const Icon(FontAwesomeIcons.check, color: Colors.greenAccent),
+              onPressed: isSaving ? null : () async {
+                setState(() {
+                  isSaving = true;
+                  showBorder = false;
+                });
+                
+                try {
+                  await Future.delayed(const Duration(milliseconds: 50));
+                  
+                  File finalFile = imageToShow;
+                  if (option['width'] != null && option['height'] != null) {
+                    finalFile = await captureRenderedImage();
+                  }
+                  
+                  await _saveImageToGallery(finalFile);
+                  
+                  if (mounted) Navigator.pop(context, finalFile);
+
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString().replaceAll("Exception: ", "")}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      isSaving = false;
+                      showBorder = true;
+                    });
+                  }
                 }
-                setState(() => showBorder = true);
-                await _saveImageToGallery(finalFile);
-                if (mounted) Navigator.of(context, rootNavigator: true).pop(); // Dismiss loader
-                if (mounted) Navigator.pop(context, finalFile);
               },
             ),
         ],
@@ -273,9 +285,11 @@ class _ResizeScreenState extends State<ResizeScreen> {
                     RepaintBoundary(
                       key: _previewKey,
                       child: Card(
-                        color: isDark ? const Color(0xFF232336) : Colors.white,
+                        color: _backgroundColor,
                         elevation: 4,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18)),
+                        clipBehavior: Clip.antiAlias,
                         child: InteractiveViewer(
                           transformationController: _transformationController,
                           minScale: 1,
@@ -292,7 +306,7 @@ class _ResizeScreenState extends State<ResizeScreen> {
                         child: Container(
                           decoration: BoxDecoration(
                             border: Border.all(
-                              color: isDark ? const Color(0xFFB69DF8) : Colors.blueAccent,
+                              color: Colors.blueAccent,
                               width: 2.5,
                             ),
                             borderRadius: BorderRadius.circular(14),
@@ -305,82 +319,130 @@ class _ResizeScreenState extends State<ResizeScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            height: 90,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF232336) : Colors.grey[100],
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark ? Colors.black.withOpacity(0.2) : Colors.grey.withOpacity(0.08),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: resizeOptions.length,
-              itemBuilder: (context, index) {
-                final isSelected = selectedOption == index;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedOption = index;
-                    });
-                  },
-                  child: Container(
-                    width: 70,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? (isDark ? const Color(0xFFB69DF8).withOpacity(0.18) : Colors.white24)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? (isDark ? const Color(0xFFB69DF8).withOpacity(0.22) : Colors.white38)
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: resizeOptions[index]['aspect'] == null
-                              ? Icon(Icons.crop, color: isDark ? Colors.white : Colors.black)
-                              : CustomPaint(
-                                  painter: _AspectRatioPainter(
-                                    aspectRatio: resizeOptions[index]['aspect'],
-                                    color: isSelected
-                                        ? (isDark ? const Color(0xFFB69DF8) : Colors.white)
-                                        : (isDark ? Colors.white54 : Colors.grey),
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          resizeOptions[index]['label'],
-                          style: TextStyle(
-                            color: isSelected
-                                ? (isDark ? const Color(0xFFB69DF8) : Colors.white)
-                                : (isDark ? Colors.white54 : Colors.grey),
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+          _buildResizeOptions(),
+          _buildColorOptions(),
+        ],
+      ),
+    );
+  }
+
+  void _showColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pick a color', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey[900],
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: _backgroundColor,
+            onColorChanged: (color) => setState(() => _backgroundColor = color),
+            pickerAreaHeightPercent: 0.8,
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Done', style: TextStyle(color: Colors.white)),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildColorOptions() {
+    return Container(
+      height: 60,
+      color: Colors.grey[900],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ..._predefinedColors.map((color) => GestureDetector(
+                onTap: () => setState(() => _backgroundColor = color),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _backgroundColor == color
+                          ? Colors.white
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              )),
+          IconButton(
+            icon: const Icon(Icons.color_lens, color: Colors.white),
+            onPressed: _showColorPicker,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResizeOptions() {
+    return Container(
+      height: 90,
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: resizeOptions.length,
+        itemBuilder: (context, index) {
+          final isSelected = selectedOption == index;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                selectedOption = index;
+              });
+            },
+            child: Container(
+              width: 70,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white24 : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white24 : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: resizeOptions[index]['aspect'] == null
+                        ? const Icon(Icons.crop, color: Colors.white)
+                        : CustomPaint(
+                            painter: _AspectRatioPainter(
+                              aspectRatio: resizeOptions[index]['aspect'],
+                              color: isSelected ? Colors.white : Colors.grey,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    resizeOptions[index]['label'],
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey,
+                      fontSize: 11,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
