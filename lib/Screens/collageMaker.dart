@@ -47,28 +47,137 @@ class _CollageScreenState extends State<CollageScreen> {
 
   // Layout options (normalized coordinates)
   final List<List<List<double>>> layoutOptions = [
-    // 2 photos - side by side
+    // 2 photos layouts
     [
-      [0.0, 0.0, 0.5, 1.0],
+      [0.0, 0.0, 0.5, 1.0], // Side by side
       [0.5, 0.0, 1.0, 1.0]
     ],
-    // 2 photos - top and bottom
     [
-      [0.0, 0.0, 1.0, 0.5],
+      [0.0, 0.0, 1.0, 0.5], // Top and bottom
       [0.0, 0.5, 1.0, 1.0]
     ],
-    // 3 photos - 1 large on left, 2 small on right
     [
-      [0.0, 0.0, 0.6, 1.0],
+      [0.0, 0.0, 0.6, 1.0], // Big left, small right
       [0.6, 0.0, 1.0, 0.5],
       [0.6, 0.5, 1.0, 1.0]
     ],
-    // 4 photos - grid
     [
-      [0.0, 0.0, 0.5, 0.5],
+      [0.0, 0.0, 0.7, 1.0], // Big left with small right strip
+      [0.7, 0.0, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 1.0, 0.7], // Big top with small bottom strip
+      [0.0, 0.7, 1.0, 1.0]
+    ],
+
+    // 3 photos layouts
+    [
+      [0.0, 0.0, 0.5, 0.5], // Classic 3-grid
+      [0.5, 0.0, 1.0, 0.5],
+      [0.0, 0.5, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.33, 1.0], // 3 vertical strips
+      [0.33, 0.0, 0.66, 1.0],
+      [0.66, 0.0, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.4, 0.4], // Diagonal emphasis
+      [0.4, 0.4, 0.8, 0.8],
+      [0.8, 0.8, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.6, 0.6], // Big top-left with two small
+      [0.6, 0.0, 1.0, 0.3],
+      [0.6, 0.3, 1.0, 0.6],
+      [0.0, 0.6, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.5, 0.33], // Top row + big bottom
+      [0.5, 0.0, 1.0, 0.33],
+      [0.0, 0.33, 1.0, 1.0]
+    ],
+
+    // 4 photos layouts
+    [
+      [0.0, 0.0, 0.5, 0.5], // Classic 2x2 grid
       [0.5, 0.0, 1.0, 0.5],
       [0.0, 0.5, 0.5, 1.0],
       [0.5, 0.5, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.33, 0.33], // 4 small + center space
+      [0.33, 0.0, 0.66, 0.33],
+      [0.66, 0.0, 1.0, 0.33],
+      [0.0, 0.33, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.4, 0.4], // Spiral layout
+      [0.4, 0.0, 1.0, 0.4],
+      [0.4, 0.4, 1.0, 1.0],
+      [0.0, 0.4, 0.4, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.6, 0.6], // Big center with surrounding
+      [0.6, 0.0, 1.0, 0.3],
+      [0.6, 0.6, 1.0, 1.0],
+      [0.0, 0.6, 0.3, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.25, 1.0], // 4 vertical strips
+      [0.25, 0.0, 0.5, 1.0],
+      [0.5, 0.0, 0.75, 1.0],
+      [0.75, 0.0, 1.0, 1.0]
+    ],
+
+    // 5 photos layouts
+    [
+      [0.0, 0.0, 0.4, 0.4], // Top-left cluster + right column
+      [0.4, 0.0, 0.8, 0.4],
+      [0.0, 0.4, 0.4, 0.8],
+      [0.4, 0.4, 0.8, 0.8],
+      [0.8, 0.0, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.5, 0.33], // 3 top + 2 bottom
+      [0.5, 0.0, 1.0, 0.33],
+      [0.0, 0.33, 0.33, 0.66],
+      [0.33, 0.33, 0.66, 0.66],
+      [0.66, 0.33, 1.0, 0.66],
+      [0.0, 0.66, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.33, 0.33], // Grid with one big
+      [0.33, 0.0, 0.66, 0.33],
+      [0.66, 0.0, 1.0, 0.33],
+      [0.0, 0.33, 0.5, 1.0],
+      [0.5, 0.33, 1.0, 1.0]
+    ],
+
+    // 6 photos layouts
+    [
+      [0.0, 0.0, 0.33, 0.5], // 3x2 grid
+      [0.33, 0.0, 0.66, 0.5],
+      [0.66, 0.0, 1.0, 0.5],
+      [0.0, 0.5, 0.33, 1.0],
+      [0.33, 0.5, 0.66, 1.0],
+      [0.66, 0.5, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.25, 0.33], // 4 top + 2 bottom
+      [0.25, 0.0, 0.5, 0.33],
+      [0.5, 0.0, 0.75, 0.33],
+      [0.75, 0.0, 1.0, 0.33],
+      [0.0, 0.33, 0.5, 1.0],
+      [0.5, 0.33, 1.0, 1.0]
+    ],
+    [
+      [0.0, 0.0, 0.4, 0.4], // Hexagonal layout
+      [0.4, 0.0, 0.8, 0.4],
+      [0.0, 0.4, 0.4, 0.8],
+      [0.4, 0.4, 0.8, 0.8],
+      [0.2, 0.2, 0.6, 0.6],
+      [0.6, 0.6, 1.0, 1.0]
     ],
   ];
 
@@ -139,10 +248,11 @@ class _CollageScreenState extends State<CollageScreen> {
         return;
       }
 
-      RenderRepaintBoundary boundary =
-          _collageKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      RenderRepaintBoundary boundary = _collageKey.currentContext!
+          .findRenderObject() as RenderRepaintBoundary;
       ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      ByteData? byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
       Uint8List pngBytes = byteData!.buffer.asUint8List();
 
       final result = await ImageGallerySaver.saveImage(
@@ -177,7 +287,8 @@ class _CollageScreenState extends State<CollageScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final frameWidth = (coords[2] - coords[0]) * screenWidth;
-    final frameHeight = (coords[3] - coords[1]) * screenHeight * (1 / frameRatio);
+    final frameHeight =
+        (coords[3] - coords[1]) * screenHeight * (1 / frameRatio);
 
     return Positioned(
       left: coords[0] * screenWidth,
@@ -185,11 +296,14 @@ class _CollageScreenState extends State<CollageScreen> {
       width: frameWidth,
       height: frameHeight,
       child: GestureDetector(
-        onTap: () => setState(() => selectedIndex = selectedIndex == index ? null : index),
+        onTap: () => setState(
+            () => selectedIndex = selectedIndex == index ? null : index),
         child: Container(
           margin: EdgeInsets.all(spacing),
           decoration: BoxDecoration(
-            border: selectedIndex == index ? Border.all(color: Colors.blue, width: 2.0) : null,
+            border: selectedIndex == index
+                ? Border.all(color: Colors.blue, width: 2.0)
+                : null,
             borderRadius: BorderRadius.circular(cornerRadius),
             boxShadow: [
               BoxShadow(
@@ -213,8 +327,10 @@ class _CollageScreenState extends State<CollageScreen> {
                 if (selectedIndex == index) {
                   setState(() {
                     final zoomDelta = (details.scale - 1) * 0.1;
-                    _imageScales[index] = (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
-                    final delta = details.localFocalPoint - _lastFocalPoints[index];
+                    _imageScales[index] =
+                        (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
+                    final delta =
+                        details.localFocalPoint - _lastFocalPoints[index];
                     _imageTranslations[index] += delta / _imageScales[index];
                     _lastFocalPoints[index] = details.localFocalPoint;
                     final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
@@ -238,12 +354,16 @@ class _CollageScreenState extends State<CollageScreen> {
               child: Transform(
                 transform: Matrix4.identity()
                   ..scale(_imageScales[index])
-                  ..translate(_imageTranslations[index].dx, _imageTranslations[index].dy),
+                  ..translate(_imageTranslations[index].dx,
+                      _imageTranslations[index].dy),
                 alignment: Alignment.center,
                 child: Container(
                   color: backgroundColor,
                   child: selectedImages.length > index
-                      ? Image.file(selectedImages[index], fit: BoxFit.cover, width: double.infinity, height: double.infinity)
+                      ? Image.file(selectedImages[index],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity)
                       : const SizedBox.shrink(),
                 ),
               ),
@@ -276,7 +396,8 @@ class _CollageScreenState extends State<CollageScreen> {
       child: Stack(
         children: [
           Container(color: backgroundColor),
-          ...List.generate(selectedImages.length, (index) => _buildPhotoFrame(index)),
+          ...List.generate(
+              selectedImages.length, (index) => _buildPhotoFrame(index)),
         ],
       ),
     );
@@ -289,7 +410,7 @@ class _CollageScreenState extends State<CollageScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: const BackButton(color: Colors.white),
+        leading: BackButton(color: Colors.white),
         title: const Text(
           'Photo Collage',
           style: TextStyle(color: Colors.white),
@@ -441,7 +562,8 @@ class _CollageScreenState extends State<CollageScreen> {
   Widget _buildLayoutOptions() {
     final imageCount = selectedImages.length;
     if (imageCount == 0) {
-      return const Text('Please select images first', style: TextStyle(color: Colors.white54));
+      return const Text('Please select images first',
+          style: TextStyle(color: Colors.white54));
     }
 
     return SizedBox(
@@ -450,7 +572,8 @@ class _CollageScreenState extends State<CollageScreen> {
         scrollDirection: Axis.horizontal,
         itemCount: layoutOptions.length,
         itemBuilder: (context, index) {
-          if (layoutOptions[index].length < imageCount) return const SizedBox.shrink();
+          if (layoutOptions[index].length < imageCount)
+            return const SizedBox.shrink();
           final isSelected = selectedLayoutIndex == index;
           return GestureDetector(
             onTap: () {
