@@ -289,7 +289,7 @@ class _CollageScreenState extends State<CollageScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: BackButton(color: Colors.white),
+        leading: const BackButton(color: Colors.white),
         title: const Text(
           'Photo Collage',
           style: TextStyle(color: Colors.white),
