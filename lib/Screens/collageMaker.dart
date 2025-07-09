@@ -15,6 +15,50 @@ class CollageScreen extends StatefulWidget {
   State<CollageScreen> createState() => _CollageScreenState();
 }
 
+// Custom painter for aspect ratio preview
+class _AspectRatioPainter extends CustomPainter {
+  final double aspectRatio;
+  final Color color;
+
+  _AspectRatioPainter({required this.aspectRatio, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    double width, height;
+    if (aspectRatio >= 1.0) {
+      width = size.width * 0.8;
+      height = width / aspectRatio;
+      if (height > size.height * 0.8) {
+        height = size.height * 0.8;
+        width = height * aspectRatio;
+      }
+    } else {
+      height = size.height * 0.8;
+      width = height * aspectRatio;
+      if (width > size.width * 0.8) {
+        width = size.width * 0.8;
+        height = width / aspectRatio;
+      }
+    }
+
+    final dx = (size.width - width) / 2;
+    final dy = (size.height - height) / 2;
+
+    final rect = Rect.fromLTWH(dx, dy, width, height);
+    canvas.drawRect(rect, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AspectRatioPainter oldDelegate) {
+    return oldDelegate.aspectRatio != aspectRatio || oldDelegate.color != color;
+  }
+}
+
 class _CollageScreenState extends State<CollageScreen> {
   int selectedLayoutIndex = 0;
   int? selectedIndex; // Track selected photo index (not saved)
@@ -517,8 +561,12 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildRatioOptions() {
-    return SizedBox(
-      height: 80,
+    return Container(
+      height: 100,
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: frameRatios.length,
@@ -534,23 +582,47 @@ class _CollageScreenState extends State<CollageScreen> {
               });
             },
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              padding: const EdgeInsets.all(8),
+              width: 80,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: isSelected ? Colors.blueAccent : Colors.grey[700]!,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(8),
+                color: isSelected ? Colors.white24 : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: Center(
-                child: Text(
-                  ratio['name'],
-                  style: TextStyle(
-                    color: isSelected ? Colors.blueAccent : Colors.white,
-                    fontWeight: FontWeight.bold,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: isSelected ? Colors.white24 : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: ratio['value'] == null
+                        ? const Icon(Icons.crop, color: Colors.white)
+                        : CustomPaint(
+                            painter: _AspectRatioPainter(
+                              aspectRatio: ratio['value'],
+                              color: isSelected ? Colors.white : Colors.grey,
+                            ),
+                          ),
                   ),
-                ),
+                  const SizedBox(height: 2),
+                  Flexible(
+                    child: Text(
+                      ratio['name'],
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey,
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -558,6 +630,8 @@ class _CollageScreenState extends State<CollageScreen> {
       ),
     );
   }
+
+  // Add the aspect ratio painter for visual preview
 
   Widget _buildLayoutOptions() {
     final imageCount = selectedImages.length;

@@ -386,7 +386,7 @@ class _ResizeScreenState extends State<ResizeScreen> {
 
   Widget _buildResizeOptions() {
     return Container(
-      height: 90,
+      height: 100,
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -403,7 +403,7 @@ class _ResizeScreenState extends State<ResizeScreen> {
               });
             },
             child: Container(
-              width: 70,
+              width: 80,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
               decoration: BoxDecoration(
@@ -429,13 +429,18 @@ class _ResizeScreenState extends State<ResizeScreen> {
                             ),
                           ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    resizeOptions[index]['label'],
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.grey,
-                      fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  const SizedBox(height: 2),
+                  Flexible(
+                    child: Text(
+                      resizeOptions[index]['label'],
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey,
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
                     ),
                   ),
                 ],
