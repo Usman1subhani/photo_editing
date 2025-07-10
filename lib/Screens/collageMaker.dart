@@ -59,37 +59,58 @@ class _AspectRatioPainter extends CustomPainter {
   }
 }
 
+// Custom painter for layout preview
+class _LayoutPreviewPainter extends CustomPainter {
+  final List<List<double>> layout;
+  final Color color;
+  _LayoutPreviewPainter({required this.layout, required this.color});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    for (final coords in layout) {
+      final left = coords[0] * size.width;
+      final top = coords[1] * size.height;
+      final right = coords[2] * size.width;
+      final bottom = coords[3] * size.height;
+      final rect = Rect.fromLTRB(left, top, right, bottom);
+      canvas.drawRect(rect, paint);
+    }
+  }
+  @override
+  bool shouldRepaint(_LayoutPreviewPainter oldDelegate) {
+    return oldDelegate.layout != layout || oldDelegate.color != color;
+  }
+}
+
 class _CollageScreenState extends State<CollageScreen> {
+  // Undo/redo stacks
+  final List<List<File>> _undoStack = [];
+  final List<List<File>> _redoStack = [];
+
+  void _pushUndo() {
+    _undoStack.add(List<File>.from(selectedImages));
+    _redoStack.clear();
+  }
   int selectedLayoutIndex = 0;
-  int? selectedIndex; // Track selected photo index (not saved)
+  int? selectedIndex;
   Color backgroundColor = Colors.black;
   double spacing = 4.0;
   double cornerRadius = 0.0;
-  double frameRatio = 1.0; // Default 1:1
-
+  double frameRatio = 1.0;
   final List<Color> _predefinedColors = [
-    Colors.black,
-    Colors.white,
-    Colors.red,
-    Colors.green,
-    Colors.blue,
-    Colors.yellow,
-    Colors.purple,
-    Colors.orange,
+    Colors.black, Colors.white, Colors.red, Colors.green, Colors.blue, Colors.yellow, Colors.purple, Colors.orange,
   ];
-
   final List<File> selectedImages = [];
   final picker = ImagePicker();
   final GlobalKey _collageKey = GlobalKey();
   bool _isSaving = false;
-  int _selectedTab = 0; // 0: Ratio, 1: Layout, 2: Margin, 3: Border
-
-  // Track transformations for each image
+  int _selectedTab = 0;
   final List<Offset> _imageTranslations = [];
   final List<double> _imageScales = [];
   final List<Offset> _lastFocalPoints = [];
-
-  // Layout options (normalized coordinates)
   final List<List<List<double>>> layoutOptions = [
     // 2 photos layouts
     [
@@ -331,91 +352,124 @@ class _CollageScreenState extends State<CollageScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     final frameWidth = (coords[2] - coords[0]) * screenWidth;
-    final frameHeight =
-        (coords[3] - coords[1]) * screenHeight * (1 / frameRatio);
+    final frameHeight = (coords[3] - coords[1]) * screenHeight * (1 / frameRatio);
 
     return Positioned(
       left: coords[0] * screenWidth,
       top: coords[1] * screenHeight * (1 / frameRatio),
       width: frameWidth,
       height: frameHeight,
-      child: GestureDetector(
-        onTap: () => setState(
-            () => selectedIndex = selectedIndex == index ? null : index),
-        child: Container(
-          margin: EdgeInsets.all(spacing),
-          decoration: BoxDecoration(
-            border: selectedIndex == index
-                ? Border.all(color: Colors.blue, width: 2.0)
-                : null,
-            borderRadius: BorderRadius.circular(cornerRadius),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.3),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
+      child: LongPressDraggable<int>(
+        data: index,
+        feedback: Opacity(
+          opacity: 0.7,
+          child: SizedBox(
+            width: frameWidth,
+            height: frameHeight,
+            child: selectedImages.length > index
+                ? Image.file(selectedImages[index], fit: BoxFit.cover)
+                : const SizedBox.shrink(),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(cornerRadius),
-            child: GestureDetector(
-              onScaleStart: (details) {
-                if (selectedIndex == index) {
-                  setState(() {
-                    _lastFocalPoints[index] = details.localFocalPoint;
-                  });
-                }
-              },
-              onScaleUpdate: (details) {
-                if (selectedIndex == index) {
-                  setState(() {
-                    final zoomDelta = (details.scale - 1) * 0.1;
-                    _imageScales[index] =
-                        (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
-                    final delta =
-                        details.localFocalPoint - _lastFocalPoints[index];
-                    _imageTranslations[index] += delta / _imageScales[index];
-                    _lastFocalPoints[index] = details.localFocalPoint;
-                    final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
-                    final maxDy = frameHeight * (_imageScales[index] - 1) / 2;
-                    _imageTranslations[index] = Offset(
-                      _imageTranslations[index].dx.clamp(-maxDx, maxDx),
-                      _imageTranslations[index].dy.clamp(-maxDy, maxDy),
-                    );
-                  });
-                }
-              },
-              onDoubleTap: () {
-                if (selectedIndex == index) {
-                  setState(() {
-                    _imageScales[index] = 1.0;
-                    _imageTranslations[index] = Offset.zero;
-                    _lastFocalPoints[index] = Offset.zero;
-                  });
-                }
-              },
-              child: Transform(
-                transform: Matrix4.identity()
-                  ..scale(_imageScales[index])
-                  ..translate(_imageTranslations[index].dx,
-                      _imageTranslations[index].dy),
-                alignment: Alignment.center,
-                child: Container(
-                  color: backgroundColor,
-                  child: selectedImages.length > index
-                      ? Image.file(selectedImages[index],
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity)
-                      : const SizedBox.shrink(),
-                ),
-              ),
-            ),
-          ),
+        ),
+        childWhenDragging: Opacity(
+          opacity: 0.3,
+          child: _buildPhotoFrameContent(index, frameWidth, frameHeight),
+        ),
+        onDragStarted: _pushUndo,
+        child: DragTarget<int>(
+          onAccept: (fromIndex) {
+            setState(() {
+              final temp = selectedImages[fromIndex];
+              selectedImages[fromIndex] = selectedImages[index];
+              selectedImages[index] = temp;
+              _resetTransforms();
+            });
+          },
+          builder: (context, candidateData, rejectedData) {
+            return GestureDetector(
+              onTap: () => setState(
+                  () => selectedIndex = selectedIndex == index ? null : index),
+              child: _buildPhotoFrameContent(index, frameWidth, frameHeight),
+            );
+          },
         ),
       ),
     );
+  }
+
+  Widget _buildPhotoFrameContent(int index, double frameWidth, double frameHeight) {
+    return Container(
+      margin: EdgeInsets.all(spacing),
+      decoration: BoxDecoration(
+        border: selectedIndex == index
+            ? Border.all(color: Colors.blue, width: 2.0)
+            : null,
+        borderRadius: BorderRadius.circular(cornerRadius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(cornerRadius),
+        child: GestureDetector(
+          onScaleStart: (details) {
+            if (selectedIndex == index) {
+              setState(() {
+                _lastFocalPoints[index] = details.localFocalPoint;
+              });
+            }
+          },
+          onScaleUpdate: (details) {
+            if (selectedIndex == index) {
+              setState(() {
+                final zoomDelta = (details.scale - 1) * 0.1;
+                _imageScales[index] =
+                    (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
+                final delta =
+                    details.localFocalPoint - _lastFocalPoints[index];
+                _imageTranslations[index] += delta / _imageScales[index];
+                _lastFocalPoints[index] = details.localFocalPoint;
+                final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
+                final maxDy = frameHeight * (_imageScales[index] - 1) / 2;
+                _imageTranslations[index] = Offset(
+                  _imageTranslations[index].dx.clamp(-maxDx, maxDx),
+                  _imageTranslations[index].dy.clamp(-maxDy, maxDy),
+                );
+              });
+            }
+          },
+          onDoubleTap: () {
+            if (selectedIndex == index) {
+              setState(() {
+                _imageScales[index] = 1.0;
+                _imageTranslations[index] = Offset.zero;
+                _lastFocalPoints[index] = Offset.zero;
+              });
+            }
+          },
+          child: Transform(
+            transform: Matrix4.identity()
+              ..scale(_imageScales[index])
+              ..translate(_imageTranslations[index].dx,
+                  _imageTranslations[index].dy),
+            alignment: Alignment.center,
+            child: Container(
+              color: backgroundColor,
+              child: selectedImages.length > index
+                  ? Image.file(selectedImages[index],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity)
+                  : const SizedBox.shrink(),
+            ),
+          ),
+          ),
+        ),
+      );
   }
 
   Widget _buildCollage() {
@@ -426,23 +480,51 @@ class _CollageScreenState extends State<CollageScreen> {
           children: [
             Icon(Icons.photo_library, size: 60, color: Colors.grey[600]),
             const SizedBox(height: 16),
-            const Text(
-              'Select photos to create collage',
-              style: TextStyle(color: Colors.white, fontSize: 18),
+            const Text('Select photos to create collage', style: TextStyle(color: Colors.white, fontSize: 18)),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Add Photos'),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+              onPressed: _pickImages,
             ),
           ],
         ),
       );
     }
-
     return AspectRatio(
       aspectRatio: frameRatio,
-      child: Stack(
-        children: [
-          Container(color: backgroundColor),
-          ...List.generate(
-              selectedImages.length, (index) => _buildPhotoFrame(index)),
-        ],
+      child: Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.white24, width: 2),
+        ),
+        child: Stack(
+          children: [
+            ...List.generate(selectedImages.length, (index) => _buildPhotoFrame(index)),
+            // Remove button for each image
+            ...List.generate(selectedImages.length, (index) => Positioned(
+              right: 8,
+              top: 8 + index * 40.0,
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    selectedImages.removeAt(index);
+                    _resetTransforms();
+                  });
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                ),
+              ),
+            )),
+          ],
+        ),
       ),
     );
   }
@@ -454,7 +536,7 @@ class _CollageScreenState extends State<CollageScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        leading: BackButton(color: Colors.white),
+        leading: const BackButton(color: Colors.white),
         title: const Text(
           'Photo Collage',
           style: TextStyle(color: Colors.white),
@@ -471,7 +553,7 @@ class _CollageScreenState extends State<CollageScreen> {
               onPressed: _pickImages,
             ),
             IconButton(
-              icon: const Icon(Icons.save, color: Colors.greenAccent),
+              icon: const Icon(Icons.check, color: Colors.greenAccent),
               onPressed: selectedImages.isNotEmpty ? _saveCollage : null,
             ),
           ],
@@ -562,7 +644,7 @@ class _CollageScreenState extends State<CollageScreen> {
 
   Widget _buildRatioOptions() {
     return Container(
-      height: 100,
+      height: 110,
       decoration: BoxDecoration(
         color: Colors.grey[900],
         borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -588,6 +670,7 @@ class _CollageScreenState extends State<CollageScreen> {
               decoration: BoxDecoration(
                 color: isSelected ? Colors.white24 : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
+                border: isSelected ? Border.all(color: Colors.blueAccent, width: 2) : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -631,23 +714,22 @@ class _CollageScreenState extends State<CollageScreen> {
     );
   }
 
-  // Add the aspect ratio painter for visual preview
-
   Widget _buildLayoutOptions() {
     final imageCount = selectedImages.length;
     if (imageCount == 0) {
-      return const Text('Please select images first',
-          style: TextStyle(color: Colors.white54));
+      return const Text('Please select images first', style: TextStyle(color: Colors.white54));
     }
-
-    return SizedBox(
-      height: 80,
+    return Container(
+      height: 110,
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+      ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: layoutOptions.length,
         itemBuilder: (context, index) {
-          if (layoutOptions[index].length < imageCount)
-            return const SizedBox.shrink();
+          if (layoutOptions[index].length < imageCount) return const SizedBox.shrink();
           final isSelected = selectedLayoutIndex == index;
           return GestureDetector(
             onTap: () {
@@ -659,20 +741,18 @@ class _CollageScreenState extends State<CollageScreen> {
             },
             child: Container(
               width: 80,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
-                border: Border.all(
-                  color: isSelected ? Colors.blueAccent : Colors.grey[700]!,
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(8),
+                color: isSelected ? Colors.white24 : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: isSelected ? Border.all(color: Colors.blueAccent, width: 2) : null,
               ),
               child: Center(
-                child: Text(
-                  'Layout ${index + 1}',
-                  style: TextStyle(
-                    color: isSelected ? Colors.blueAccent : Colors.white,
-                    fontWeight: FontWeight.bold,
+                child: CustomPaint(
+                  size: const Size(50, 50),
+                  painter: _LayoutPreviewPainter(
+                    layout: layoutOptions[index],
+                    color: isSelected ? Colors.white : Colors.grey,
                   ),
                 ),
               ),
