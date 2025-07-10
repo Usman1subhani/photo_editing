@@ -85,7 +85,123 @@ class _LayoutPreviewPainter extends CustomPainter {
   }
 }
 
+
 class _CollageScreenState extends State<CollageScreen> {
+  bool _isSavingImage = false;
+
+  // --- Resize helpers (must be above _buildPhotoFrame for Dart) ---
+  List<Widget> _buildResizeHandles(int index, List<double> coords, double screenWidth, double screenHeight, double frameWidth, double frameHeight) {
+    // Hide resize handles when saving
+    if (_isSavingImage == true) return [];
+    final handles = <Widget>[];
+    // Smaller handle size
+    const double handleSize = 20;
+    final directions = [
+      {'dx': -handleSize / 9, 'dy': frameHeight / 2 - handleSize / 5, 'icon': Icons.arrow_left, 'dir': 0},
+      {'dx': frameWidth / 2 - handleSize / 5, 'dy': -handleSize / 15, 'icon': Icons.arrow_drop_up, 'dir': 1},
+      {'dx': frameWidth - handleSize / 0.8, 'dy': frameHeight / 2 - handleSize / 5, 'icon': Icons.arrow_right, 'dir': 2},
+      {'dx': frameWidth / 2 - handleSize / 5, 'dy': frameHeight - handleSize / 0.8, 'icon': Icons.arrow_drop_down, 'dir': 3},
+    ];
+    for (final d in directions) {
+      handles.add(Positioned(
+        left: d['dx'] as double,
+        top: d['dy'] as double,
+        child: GestureDetector(
+          onPanStart: (details) {
+            _resizeDirection = d['dir'] as int;
+            _dragStart = details.globalPosition;
+            final layouts = layoutOptionsByCount[selectedImages.length] ?? [];
+            if (selectedLayoutIndex < layouts.length) {
+              _customLayout = List<List<double>>.from(
+                ( _customLayout ?? layouts[selectedLayoutIndex] ).map((e) => List<double>.from(e))
+              );
+            }
+          },
+          onPanUpdate: (details) {
+            if (_resizeDirection == null || _customLayout == null) return;
+            // Reduce sensitivity by multiplying delta by 0.08 (slower, more precise)
+            final delta = (details.globalPosition - (_dragStart ?? Offset.zero)) * 0.08;
+            setState(() {
+              _resizeFrame(index, _resizeDirection!, delta, screenWidth, screenHeight);
+            });
+          },
+          onPanEnd: (_) {
+            _resizeDirection = null;
+            _dragStart = null;
+          },
+          child: Container(
+            width: handleSize,
+            height: handleSize,
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.7),
+              shape: BoxShape.rectangle,
+              border: Border.all(color: Colors.white, width: 1),
+            ),
+            child: Icon(d['icon'] as IconData, color: Colors.white, size: 14),
+          ),
+        ),
+      ));
+    }
+    return handles;
+  }
+
+  void _resizeFrame(int index, int direction, Offset delta, double screenWidth, double screenHeight) {
+    if (_customLayout == null) return;
+    final layout = _customLayout!;
+    final coords = layout[index];
+    double dx = delta.dx / screenWidth;
+    double dy = delta.dy / (screenHeight * (1 / frameRatio));
+    switch (direction) {
+      case 0: // left
+        double newLeft = (coords[0] + dx).clamp(0.0, coords[2] - _minFrameSize);
+        for (int i = 0; i < layout.length; i++) {
+          if (i != index && (layout[i][2] - coords[0]).abs() < 0.01 && _isVerticallyOverlapping(layout[i], coords)) {
+            layout[i][2] = newLeft;
+          }
+        }
+        coords[0] = newLeft;
+        break;
+      case 1: // top
+        double newTop = (coords[1] + dy).clamp(0.0, coords[3] - _minFrameSize);
+        for (int i = 0; i < layout.length; i++) {
+          if (i != index && (layout[i][3] - coords[1]).abs() < 0.01 && _isHorizontallyOverlapping(layout[i], coords)) {
+            layout[i][3] = newTop;
+          }
+        }
+        coords[1] = newTop;
+        break;
+      case 2: // right
+        double newRight = (coords[2] + dx).clamp(coords[0] + _minFrameSize, 1.0);
+        for (int i = 0; i < layout.length; i++) {
+          if (i != index && (layout[i][0] - coords[2]).abs() < 0.01 && _isVerticallyOverlapping(layout[i], coords)) {
+            layout[i][0] = newRight;
+          }
+        }
+        coords[2] = newRight;
+        break;
+      case 3: // bottom
+        double newBottom = (coords[3] + dy).clamp(coords[1] + _minFrameSize, 1.0);
+        for (int i = 0; i < layout.length; i++) {
+          if (i != index && (layout[i][1] - coords[3]).abs() < 0.01 && _isHorizontallyOverlapping(layout[i], coords)) {
+            layout[i][1] = newBottom;
+          }
+        }
+        coords[3] = newBottom;
+        break;
+    }
+  }
+
+  bool _isVerticallyOverlapping(List<double> a, List<double> b) {
+    return (a[1] < b[3]) && (a[3] > b[1]);
+  }
+  bool _isHorizontallyOverlapping(List<double> a, List<double> b) {
+    return (a[0] < b[2]) && (a[2] > b[0]);
+  }
+  // For interactive resizing
+  List<List<double>>? _customLayout; // If user resizes, this overrides the default layout
+  int? _resizeDirection; // 0=left, 1=top, 2=right, 3=bottom
+  Offset? _dragStart;
+  double _minFrameSize = 0.15; // Minimum width/height as fraction
   // Undo/redo stacks
   final List<List<File>> _undoStack = [];
   final List<List<File>> _redoStack = [];
@@ -111,140 +227,93 @@ class _CollageScreenState extends State<CollageScreen> {
   final List<Offset> _imageTranslations = [];
   final List<double> _imageScales = [];
   final List<Offset> _lastFocalPoints = [];
-  final List<List<List<double>>> layoutOptions = [
-    // 2 photos layouts
-    [
-      [0.0, 0.0, 0.5, 1.0], // Side by side
-      [0.5, 0.0, 1.0, 1.0]
+  // Layouts grouped by photo count for easier filtering and extension
+  final Map<int, List<List<List<double>>>> layoutOptionsByCount = {
+    2: [
+      // Side by side
+      [
+        [0.0, 0.0, 0.5, 1.0],
+        [0.5, 0.0, 1.0, 1.0],
+      ],
+      // Top and bottom
+      [
+        [0.0, 0.0, 1.0, 0.5],
+        [0.0, 0.5, 1.0, 1.0],
+      ],
+      // Diagonal split
+      [
+        [0.0, 0.0, 1.0, 0.6],
+        [0.0, 0.4, 1.0, 1.0],
+      ],
+      // Heart shape (approximate, for 2 images)
+      [
+        [0.05, 0.15, 0.48, 0.85],
+        [0.52, 0.15, 0.95, 0.85],
+      ],
+      // Fancy: one big, one small corner
+      [
+        [0.0, 0.0, 0.8, 1.0],
+        [0.8, 0.7, 1.0, 1.0],
+      ],
     ],
-    [
-      [0.0, 0.0, 1.0, 0.5], // Top and bottom
-      [0.0, 0.5, 1.0, 1.0]
+    3: [
+      // Classic 3-grid
+      [
+        [0.0, 0.0, 0.5, 0.5],
+        [0.5, 0.0, 1.0, 0.5],
+        [0.0, 0.5, 1.0, 1.0],
+      ],
+      // 3 vertical strips
+      [
+        [0.0, 0.0, 0.33, 1.0],
+        [0.33, 0.0, 0.66, 1.0],
+        [0.66, 0.0, 1.0, 1.0],
+      ],
+      // Triangle/heart (approximate)
+      [
+        [0.15, 0.15, 0.85, 0.5],
+        [0.05, 0.5, 0.45, 0.95],
+        [0.55, 0.5, 0.95, 0.95],
+      ],
+      // Fancy: one big, two small
+      [
+        [0.0, 0.0, 0.7, 1.0],
+        [0.7, 0.0, 1.0, 0.5],
+        [0.7, 0.5, 1.0, 1.0],
+      ],
     ],
-    [
-      [0.0, 0.0, 0.6, 1.0], // Big left, small right
-      [0.6, 0.0, 1.0, 0.5],
-      [0.6, 0.5, 1.0, 1.0]
+    4: [
+      // Classic 2x2 grid
+      [
+        [0.0, 0.0, 0.5, 0.5],
+        [0.5, 0.0, 1.0, 0.5],
+        [0.0, 0.5, 0.5, 1.0],
+        [0.5, 0.5, 1.0, 1.0],
+      ],
+      // Spiral
+      [
+        [0.0, 0.0, 0.7, 0.7],
+        [0.7, 0.0, 1.0, 0.3],
+        [0.7, 0.3, 1.0, 0.7],
+        [0.0, 0.7, 1.0, 1.0],
+      ],
+      // Heart/flower (approximate)
+      [
+        [0.25, 0.05, 0.75, 0.45],
+        [0.05, 0.25, 0.45, 0.75],
+        [0.55, 0.25, 0.95, 0.75],
+        [0.25, 0.55, 0.75, 0.95],
+      ],
+      // Fancy: one big, three small
+      [
+        [0.0, 0.0, 0.7, 1.0],
+        [0.7, 0.0, 1.0, 0.3],
+        [0.7, 0.3, 1.0, 0.7],
+        [0.7, 0.7, 1.0, 1.0],
+      ],
     ],
-    [
-      [0.0, 0.0, 0.7, 1.0], // Big left with small right strip
-      [0.7, 0.0, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 1.0, 0.7], // Big top with small bottom strip
-      [0.0, 0.7, 1.0, 1.0]
-    ],
-
-    // 3 photos layouts
-    [
-      [0.0, 0.0, 0.5, 0.5], // Classic 3-grid
-      [0.5, 0.0, 1.0, 0.5],
-      [0.0, 0.5, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.33, 1.0], // 3 vertical strips
-      [0.33, 0.0, 0.66, 1.0],
-      [0.66, 0.0, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.4, 0.4], // Diagonal emphasis
-      [0.4, 0.4, 0.8, 0.8],
-      [0.8, 0.8, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.6, 0.6], // Big top-left with two small
-      [0.6, 0.0, 1.0, 0.3],
-      [0.6, 0.3, 1.0, 0.6],
-      [0.0, 0.6, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.5, 0.33], // Top row + big bottom
-      [0.5, 0.0, 1.0, 0.33],
-      [0.0, 0.33, 1.0, 1.0]
-    ],
-
-    // 4 photos layouts
-    [
-      [0.0, 0.0, 0.5, 0.5], // Classic 2x2 grid
-      [0.5, 0.0, 1.0, 0.5],
-      [0.0, 0.5, 0.5, 1.0],
-      [0.5, 0.5, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.33, 0.33], // 4 small + center space
-      [0.33, 0.0, 0.66, 0.33],
-      [0.66, 0.0, 1.0, 0.33],
-      [0.0, 0.33, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.4, 0.4], // Spiral layout
-      [0.4, 0.0, 1.0, 0.4],
-      [0.4, 0.4, 1.0, 1.0],
-      [0.0, 0.4, 0.4, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.6, 0.6], // Big center with surrounding
-      [0.6, 0.0, 1.0, 0.3],
-      [0.6, 0.6, 1.0, 1.0],
-      [0.0, 0.6, 0.3, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.25, 1.0], // 4 vertical strips
-      [0.25, 0.0, 0.5, 1.0],
-      [0.5, 0.0, 0.75, 1.0],
-      [0.75, 0.0, 1.0, 1.0]
-    ],
-
-    // 5 photos layouts
-    [
-      [0.0, 0.0, 0.4, 0.4], // Top-left cluster + right column
-      [0.4, 0.0, 0.8, 0.4],
-      [0.0, 0.4, 0.4, 0.8],
-      [0.4, 0.4, 0.8, 0.8],
-      [0.8, 0.0, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.5, 0.33], // 3 top + 2 bottom
-      [0.5, 0.0, 1.0, 0.33],
-      [0.0, 0.33, 0.33, 0.66],
-      [0.33, 0.33, 0.66, 0.66],
-      [0.66, 0.33, 1.0, 0.66],
-      [0.0, 0.66, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.33, 0.33], // Grid with one big
-      [0.33, 0.0, 0.66, 0.33],
-      [0.66, 0.0, 1.0, 0.33],
-      [0.0, 0.33, 0.5, 1.0],
-      [0.5, 0.33, 1.0, 1.0]
-    ],
-
-    // 6 photos layouts
-    [
-      [0.0, 0.0, 0.33, 0.5], // 3x2 grid
-      [0.33, 0.0, 0.66, 0.5],
-      [0.66, 0.0, 1.0, 0.5],
-      [0.0, 0.5, 0.33, 1.0],
-      [0.33, 0.5, 0.66, 1.0],
-      [0.66, 0.5, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.25, 0.33], // 4 top + 2 bottom
-      [0.25, 0.0, 0.5, 0.33],
-      [0.5, 0.0, 0.75, 0.33],
-      [0.75, 0.0, 1.0, 0.33],
-      [0.0, 0.33, 0.5, 1.0],
-      [0.5, 0.33, 1.0, 1.0]
-    ],
-    [
-      [0.0, 0.0, 0.4, 0.4], // Hexagonal layout
-      [0.4, 0.0, 0.8, 0.4],
-      [0.0, 0.4, 0.4, 0.8],
-      [0.4, 0.4, 0.8, 0.8],
-      [0.2, 0.2, 0.6, 0.6],
-      [0.6, 0.6, 1.0, 1.0]
-    ],
-  ];
+    // Add more for 5, 6, etc. as needed
+  };
 
   // Expanded frame ratio options (including those from resizeScreen.dart assumption)
   final List<Map<String, dynamic>> frameRatios = [
@@ -283,13 +352,8 @@ class _CollageScreenState extends State<CollageScreen> {
         _resetTransforms();
         selectedLayoutIndex = 0;
         selectedIndex = null; // Reset selection
-        while (selectedLayoutIndex < layoutOptions.length &&
-            layoutOptions[selectedLayoutIndex].length < selectedImages.length) {
-          selectedLayoutIndex++;
-        }
-        if (selectedLayoutIndex >= layoutOptions.length) {
-          selectedLayoutIndex = 0;
-        }
+        selectedLayoutIndex = 0;
+        _customLayout = null;
       });
     }
   }
@@ -298,7 +362,11 @@ class _CollageScreenState extends State<CollageScreen> {
     setState(() {
       selectedIndex = null; // Remove blue border before saving
       _isSaving = true;
+      _isSavingImage = true;
     });
+
+    // Wait for the UI to update and hide overlays
+    await Future.delayed(const Duration(milliseconds: 50));
 
     try {
       PermissionStatus status = await Permission.photos.request();
@@ -306,7 +374,10 @@ class _CollageScreenState extends State<CollageScreen> {
         status = await Permission.storage.request();
       }
       if (!status.isGranted) {
-        setState(() => _isSaving = false);
+        setState(() {
+          _isSaving = false;
+          _isSavingImage = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Permission not granted')),
         );
@@ -325,7 +396,10 @@ class _CollageScreenState extends State<CollageScreen> {
         name: 'collage_${DateTime.now().millisecondsSinceEpoch}',
       );
 
-      setState(() => _isSaving = false);
+      setState(() {
+        _isSaving = false;
+        _isSavingImage = false;
+      });
 
       if (result['isSuccess'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -337,7 +411,10 @@ class _CollageScreenState extends State<CollageScreen> {
         );
       }
     } catch (e) {
-      setState(() => _isSaving = false);
+      setState(() {
+        _isSaving = false;
+        _isSavingImage = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -345,9 +422,11 @@ class _CollageScreenState extends State<CollageScreen> {
   }
 
   Widget _buildPhotoFrame(int index) {
-    final layout = layoutOptions[selectedLayoutIndex];
+    final layouts = layoutOptionsByCount[selectedImages.length] ?? [];
+    if (selectedLayoutIndex >= layouts.length) return const SizedBox.shrink();
+    // Use custom layout if resizing, else default
+    final layout = _customLayout ?? layouts[selectedLayoutIndex];
     if (index >= layout.length) return const SizedBox.shrink();
-
     final coords = layout[index];
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -359,118 +438,120 @@ class _CollageScreenState extends State<CollageScreen> {
       top: coords[1] * screenHeight * (1 / frameRatio),
       width: frameWidth,
       height: frameHeight,
-      child: LongPressDraggable<int>(
-        data: index,
-        feedback: Opacity(
-          opacity: 0.7,
-          child: SizedBox(
-            width: frameWidth,
-            height: frameHeight,
-            child: selectedImages.length > index
-                ? Image.file(selectedImages[index], fit: BoxFit.cover)
-                : const SizedBox.shrink(),
-          ),
-        ),
-        childWhenDragging: Opacity(
-          opacity: 0.3,
-          child: _buildPhotoFrameContent(index, frameWidth, frameHeight),
-        ),
-        onDragStarted: _pushUndo,
-        child: DragTarget<int>(
-          onAccept: (fromIndex) {
-            setState(() {
-              final temp = selectedImages[fromIndex];
-              selectedImages[fromIndex] = selectedImages[index];
-              selectedImages[index] = temp;
-              _resetTransforms();
-            });
-          },
-          builder: (context, candidateData, rejectedData) {
-            return GestureDetector(
-              onTap: () => setState(
-                  () => selectedIndex = selectedIndex == index ? null : index),
+      child: Stack(
+        children: [
+          LongPressDraggable<int>(
+            data: index,
+            feedback: Opacity(
+              opacity: 0.7,
+              child: SizedBox(
+                width: frameWidth,
+                height: frameHeight,
+                child: selectedImages.length > index
+                    ? Image.file(selectedImages[index], fit: BoxFit.cover)
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            childWhenDragging: Opacity(
+              opacity: 0.3,
               child: _buildPhotoFrameContent(index, frameWidth, frameHeight),
-            );
-          },
-        ),
+            ),
+            onDragStarted: _pushUndo,
+            child: DragTarget<int>(
+              onAccept: (fromIndex) {
+                setState(() {
+                  final temp = selectedImages[fromIndex];
+                  selectedImages[fromIndex] = selectedImages[index];
+                  selectedImages[index] = temp;
+                  _resetTransforms();
+                });
+              },
+              builder: (context, candidateData, rejectedData) {
+                return GestureDetector(
+                  onTap: () => setState(
+                      () => selectedIndex = selectedIndex == index ? null : index),
+                  child: _buildPhotoFrameContent(index, frameWidth, frameHeight),
+                );
+              },
+            ),
+          ),
+          if (!_isSavingImage && selectedIndex == index) ..._buildResizeHandles(index, coords, screenWidth, screenHeight, frameWidth, frameHeight),
+        ],
       ),
     );
   }
 
   Widget _buildPhotoFrameContent(int index, double frameWidth, double frameHeight) {
-    return Container(
-      margin: EdgeInsets.all(spacing),
-      decoration: BoxDecoration(
-        border: selectedIndex == index
-            ? Border.all(color: Colors.blue, width: 2.0)
-            : null,
-        borderRadius: BorderRadius.circular(cornerRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+    final isSelected = selectedIndex == index;
+    return Stack(
+      children: [
+        Container(
+          margin: EdgeInsets.all(spacing),
+          decoration: BoxDecoration(
+            border: (!_isSavingImage && isSelected) ? Border.all(color: Colors.blue, width: 2.0) : null,
+            borderRadius: BorderRadius.circular(cornerRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(cornerRadius),
-        child: GestureDetector(
-          onScaleStart: (details) {
-            if (selectedIndex == index) {
-              setState(() {
-                _lastFocalPoints[index] = details.localFocalPoint;
-              });
-            }
-          },
-          onScaleUpdate: (details) {
-            if (selectedIndex == index) {
-              setState(() {
-                final zoomDelta = (details.scale - 1) * 0.1;
-                _imageScales[index] =
-                    (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
-                final delta =
-                    details.localFocalPoint - _lastFocalPoints[index];
-                _imageTranslations[index] += delta / _imageScales[index];
-                _lastFocalPoints[index] = details.localFocalPoint;
-                final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
-                final maxDy = frameHeight * (_imageScales[index] - 1) / 2;
-                _imageTranslations[index] = Offset(
-                  _imageTranslations[index].dx.clamp(-maxDx, maxDx),
-                  _imageTranslations[index].dy.clamp(-maxDy, maxDy),
-                );
-              });
-            }
-          },
-          onDoubleTap: () {
-            if (selectedIndex == index) {
-              setState(() {
-                _imageScales[index] = 1.0;
-                _imageTranslations[index] = Offset.zero;
-                _lastFocalPoints[index] = Offset.zero;
-              });
-            }
-          },
-          child: Transform(
-            transform: Matrix4.identity()
-              ..scale(_imageScales[index])
-              ..translate(_imageTranslations[index].dx,
-                  _imageTranslations[index].dy),
-            alignment: Alignment.center,
-            child: Container(
-              color: backgroundColor,
-              child: selectedImages.length > index
-                  ? Image.file(selectedImages[index],
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity)
-                  : const SizedBox.shrink(),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(cornerRadius),
+            child: GestureDetector(
+              onScaleStart: (details) {
+                if (isSelected) {
+                  setState(() {
+                    _lastFocalPoints[index] = details.localFocalPoint;
+                  });
+                }
+              },
+              onScaleUpdate: (details) {
+                if (isSelected) {
+                  setState(() {
+                    final zoomDelta = (details.scale - 1) * 0.1;
+                    _imageScales[index] =
+                        (_imageScales[index] + zoomDelta).clamp(0.5, 4.0);
+                    final delta =
+                        details.localFocalPoint - _lastFocalPoints[index];
+                    _imageTranslations[index] += delta / _imageScales[index];
+                    _lastFocalPoints[index] = details.localFocalPoint;
+                    final maxDx = frameWidth * (_imageScales[index] - 1) / 2;
+                    final maxDy = frameHeight * (_imageScales[index] - 1) / 2;
+                    _imageTranslations[index] = Offset(
+                      _imageTranslations[index].dx.clamp(-maxDx, maxDx),
+                      _imageTranslations[index].dy.clamp(-maxDy, maxDy),
+                    );
+                  });
+                }
+              },
+              // Remove double-tap reset
+              child: Transform(
+                transform: Matrix4.identity()
+                  ..scale(_imageScales[index])
+                  ..translate(_imageTranslations[index].dx,
+                      _imageTranslations[index].dy),
+                alignment: Alignment.center,
+                child: Container(
+                  color: backgroundColor,
+                  child: selectedImages.length > index
+                      ? Image.file(selectedImages[index],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity)
+                      : const SizedBox.shrink(),
+                ),
+              ),
             ),
           ),
-          ),
         ),
-      );
+        // Resize handles are handled in _buildPhotoFrame, not here
+      ],
+    );
   }
+
 
   Widget _buildCollage() {
     if (selectedImages.isEmpty) {
@@ -498,31 +579,32 @@ class _CollageScreenState extends State<CollageScreen> {
         decoration: BoxDecoration(
           color: backgroundColor,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white24, width: 2),
+          border: _isSavingImage ? null : Border.all(color: Colors.white24, width: 2),
         ),
         child: Stack(
           children: [
             ...List.generate(selectedImages.length, (index) => _buildPhotoFrame(index)),
-            // Remove button for each image
-            ...List.generate(selectedImages.length, (index) => Positioned(
-              right: 8,
-              top: 8 + index * 40.0,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    selectedImages.removeAt(index);
-                    _resetTransforms();
-                  });
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    shape: BoxShape.circle,
+            // Remove button for each image (hide when saving)
+            if (!_isSavingImage)
+              ...List.generate(selectedImages.length, (index) => Positioned(
+                right: 8,
+                top: 8 + index * 40.0,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      selectedImages.removeAt(index);
+                      _resetTransforms();
+                    });
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.7),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, color: Colors.white, size: 20),
                   ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 20),
                 ),
-              ),
-            )),
+              )),
           ],
         ),
       ),
@@ -719,6 +801,10 @@ class _CollageScreenState extends State<CollageScreen> {
     if (imageCount == 0) {
       return const Text('Please select images first', style: TextStyle(color: Colors.white54));
     }
+    final layouts = layoutOptionsByCount[imageCount] ?? [];
+    if (layouts.isEmpty) {
+      return const Text('No layouts available for this photo count', style: TextStyle(color: Colors.white54));
+    }
     return Container(
       height: 110,
       decoration: BoxDecoration(
@@ -727,9 +813,8 @@ class _CollageScreenState extends State<CollageScreen> {
       ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: layoutOptions.length,
+        itemCount: layouts.length,
         itemBuilder: (context, index) {
-          if (layoutOptions[index].length < imageCount) return const SizedBox.shrink();
           final isSelected = selectedLayoutIndex == index;
           return GestureDetector(
             onTap: () {
@@ -751,7 +836,7 @@ class _CollageScreenState extends State<CollageScreen> {
                 child: CustomPaint(
                   size: const Size(50, 50),
                   painter: _LayoutPreviewPainter(
-                    layout: layoutOptions[index],
+                    layout: layouts[index],
                     color: isSelected ? Colors.white : Colors.grey,
                   ),
                 ),
